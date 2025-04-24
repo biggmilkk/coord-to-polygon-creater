@@ -1,6 +1,8 @@
 streamlit
 simplekml
 folium
-streamlit-folium
 geopandas
 rasterstats
+streamlit-folium
+fiona
+shapely
