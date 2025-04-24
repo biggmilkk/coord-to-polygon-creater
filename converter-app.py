@@ -1,4 +1,4 @@
 import streamlit as st
 
-st.title("Hello Streamlit")
-st.write("If you see this, your app boots successfully.")
+st.title("✅ Minimal Test")
+st.success("If you see this, your deployment is working.")
