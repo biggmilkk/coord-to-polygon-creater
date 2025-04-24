@@ -163,7 +163,7 @@ if "coords" in st.session_state:
             use_container_width=True
         )
 
-    # --- Map Preview and Population Estimate (anchored layout) ---
+    # --- Map Preview and Population Estimate ---
     st.markdown("<h4 style='text-align: center;'>Polygon Preview</h4>", unsafe_allow_html=True)
     lon_center = sum([pt[0] for pt in coords]) / len(coords)
     lat_center = sum([pt[1] for pt in coords]) / len(coords)
@@ -174,7 +174,7 @@ if "coords" in st.session_state:
     with map_anchor.container():
         st_folium(m, width=700, height=400)
 
-        # Population Estimate (directly below map)
+        # Population Estimate
         raster_path = "data/landscan-global-2023.tif"
         population = estimate_population_from_coords(coords, raster_path)
         if population is not None:
