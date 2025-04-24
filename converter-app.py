@@ -2,14 +2,18 @@ import streamlit as st
 import simplekml
 import folium
 import re
+import geopandas as gpd
+from rasterstats import zonal_stats
 from streamlit_folium import st_folium
+import tempfile
+import os
 
 st.set_page_config(page_title="KML Polygon Generator", layout="centered")
 
 # --- Title ---
 st.markdown("<h2 style='text-align: center;'>Coordinates → KML Polygon Generator</h2>", unsafe_allow_html=True)
 st.markdown(
-    "<p style='text-align: center; font-size: 0.9rem; color: grey;'>Paste your coordinates below to visualize and export a KML polygon.</p>",
+    "<p style='text-align: center; font-size: 0.9rem; color: grey;'>Paste coordinates below to generate a KML polygon, view it on a map, and estimate population from LandScan data.</p>",
     unsafe_allow_html=True
 )
 
@@ -21,7 +25,7 @@ raw_input = st.text_area(
     key="coord_input"
 )
 
-# --- Parse function ---
+# --- Parse Function ---
 def parse_coords(text):
     tokens = re.findall(r'\d+', text)
     coords = []
@@ -30,7 +34,7 @@ def parse_coords(text):
         try:
             lat = int(tokens[i]) / 100.0
             lon = -int(tokens[i + 1]) / 100.0
-            coords.append((lon, lat))
+            coords.append((lon, lat))  # KML + folium: (lon, lat)
         except ValueError:
             pass
         i += 2
@@ -38,7 +42,35 @@ def parse_coords(text):
         coords.append(coords[0])
     return coords
 
-# --- Button to trigger generation ---
+# --- Population Calculation from GeoJSON ---
+def estimate_population_from_coords(coords, raster_path):
+    try:
+        # Create a temporary GeoJSON from coordinates
+        poly_geojson = {
+            "type": "FeatureCollection",
+            "features": [{
+                "type": "Feature",
+                "geometry": {
+                    "type": "Polygon",
+                    "coordinates": [coords]
+                },
+                "properties": {}
+            }]
+        }
+
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".geojson", mode="w") as tmp:
+            gdf = gpd.GeoDataFrame.from_features(poly_geojson["features"])
+            gdf.to_file(tmp.name, driver="GeoJSON")
+            tmp_path = tmp.name
+
+        stats = zonal_stats(tmp_path, raster_path, stats=["sum"])
+        os.unlink(tmp_path)
+        return stats[0]["sum"]
+    except Exception as e:
+        st.error(f"Error estimating population: {e}")
+        return None
+
+# --- KML Button ---
 generate_clicked = st.button("Generate KML", use_container_width=True)
 
 if generate_clicked:
@@ -51,7 +83,7 @@ if generate_clicked:
     else:
         st.warning("Please enter some coordinates.")
 
-# --- Show KML and map if available ---
+# --- Results ---
 if "coords" in st.session_state:
     coords = st.session_state["coords"]
 
@@ -60,7 +92,7 @@ if "coords" in st.session_state:
     kml.newpolygon(name="My Polygon", outerboundaryis=coords)
     kml_bytes = kml.kml().encode("utf-8")
 
-    # --- Centered Download Button ---
+    # --- Download Button ---
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
         st.download_button(
@@ -79,32 +111,11 @@ if "coords" in st.session_state:
     folium.Polygon(locations=[(lat, lon) for lon, lat in coords], color="blue", fill=True).add_to(m)
     st_folium(m, width=700, height=500)
 
-# --- Advanced Analysis: Population from LandScan ---
-with st.expander("🔬 Advanced: Estimate Population from LandScan", expanded=False):
-    st.markdown("Upload a **GeoJSON polygon** to calculate estimated population using a LandScan raster.")
-    
-    uploaded_file = st.file_uploader("Upload GeoJSON Polygon", type=["geojson"])
-    
-    # Replace with the actual path to your LandScan GeoTIFF raster
+    # --- Population Estimation ---
     landsan_raster = "./landscan_2022.tif"  # Update this path
-    
-    def calculate_population(polygon_path):
-        try:
-            stats = zonal_stats(polygon_path, landsan_raster, stats=["sum"])
-            return stats[0]["sum"]
-        except Exception as e:
-            st.error(f"Error: {str(e)}")
-            return None
+    population = estimate_population_from_coords(coords, landsan_raster)
 
-    if uploaded_file:
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".geojson") as tmp:
-            tmp.write(uploaded_file.getvalue())
-            tmp_path = tmp.name
-
-        with st.spinner("Calculating population..."):
-            population = calculate_population(tmp_path)
-            os.unlink(tmp_path)
-
-            if population is not None:
-                st.success(f"Estimated Population: {population:,.0f}")
-                st.caption("Note: LandScan estimates ambient population (24-hour average).")
+    if population is not None:
+        st.markdown("<h4 style='text-align: center;'>Estimated Population</h4>", unsafe_allow_html=True)
+        st.success(f"Estimated Population: {population:,.0f}")
+        st.caption("Note: LandScan represents ambient population (24-hour average).")
