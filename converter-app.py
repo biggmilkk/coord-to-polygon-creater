@@ -13,10 +13,6 @@ st.set_page_config(page_title="KML Polygon Generator", layout="centered")
 
 # --- Title ---
 st.markdown("<h2 style='text-align: center;'>Coordinates → KML Polygon Generator</h2>", unsafe_allow_html=True)
-st.markdown(
-    "<p style='text-align: center; font-size: 0.9rem; color: grey;'>Paste coordinates below (mixed formats allowed) to generate a polygon, preview it on a map, download KML & GeoJSON, and estimate population using LandScan data.</p>",
-    unsafe_allow_html=True
-)
 
 # --- Input ---
 raw_input = st.text_area(
