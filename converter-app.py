@@ -60,9 +60,6 @@ if "coords" in st.session_state:
     kml.newpolygon(name="My Polygon", outerboundaryis=coords)
     kml_bytes = kml.kml().encode("utf-8")
 
-    st.markdown("<hr>", unsafe_allow_html=True)
-    st.markdown("<h4 style='text-align: center;'>KML Output</h4>", unsafe_allow_html=True)
-
     # --- Centered Download Button ---
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
