@@ -169,7 +169,7 @@ if "coords" in st.session_state:
     folium.Polygon(locations=[(lat, lon) for lon, lat in coords], color="blue", fill=True).add_to(m)
 
     with st.container():
-    col_map, col_data = st.columns([3, 2], gap="large")
+        col_map, col_data = st.columns([3, 2], gap="large")
 
     with col_map:
         st_folium(m, width=600, height=400)
