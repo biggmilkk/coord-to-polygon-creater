@@ -42,11 +42,10 @@ def parse_coords(text):
     tokens = re.findall(r'-?\d+\.?\d*|[NSEW]', text)
     coords = []
     i = 0
-    parsed = []
 
-    # --- DMS / DDM Parser ---
-    dms_pattern = re.compile(r"(\d+)°(\d+)'(\d+)[\"′]?\s*([NSEW])")
-    ddm_pattern = re.compile(r"(\d+)°(\d+\.\d+)'?\s*([NSEW])")
+    # --- DMS / DDM Regex ---
+    dms_pattern = re.compile(r"(\d+)°\s*(\d+)'\s*(\d+(?:\.\d+)?)\"?\s*([NSEW])")
+    ddm_pattern = re.compile(r"(\d+)°\s*(\d+\.\d+)'?\s*([NSEW])")
 
     dms_matches = dms_pattern.findall(text)
     ddm_matches = ddm_pattern.findall(text)
@@ -64,6 +63,27 @@ def parse_coords(text):
             lon = ddm_to_dd(*ddm_matches[j + 1])
             coords.append((lon, lat))
         return coords
+
+    # --- Fallback: Decimal or scaled int format ---
+    while i < len(tokens) - 1:
+        try:
+            lat = float(tokens[i])
+            lon = float(tokens[i + 1])
+
+            if abs(lat) > 90:
+                lat = lat / 100.0
+            if abs(lon) > 180:
+                lon = -abs(lon / 100.0)
+
+            coords.append((lon, lat))
+        except ValueError:
+            pass
+        i += 2
+
+    if coords and coords[0] != coords[-1]:
+        coords.append(coords[0])
+    return coords
+
 
     # --- Default fallback (Decimal degrees or 3906/10399 format) ---
     while i < len(tokens) - 1:
