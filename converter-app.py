@@ -187,6 +187,9 @@ if "coords" in st.session_state:
             use_container_width=True
         )
 
+    st.write("Parsed coordinates:", parsed_coords)
+    st.write("Count:", len(parsed_coords))
+    
     # --- Map Preview ---
     st.markdown("<h4 style='text-align: center;'>Polygon Preview</h4>", unsafe_allow_html=True)
     lon_center = sum([pt[0] for pt in coords]) / len(coords)
