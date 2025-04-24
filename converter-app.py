@@ -112,7 +112,7 @@ if "coords" in st.session_state:
     st_folium(m, width=700, height=500)
 
     # --- Population Estimation ---
-    raster_path = "data/landscan_2023.tif"  # Update to match file location
+    raster_path = "data/landscan-global-2023.tif"
     population = estimate_population_from_coords(coords, raster_path)
 
     if population is not None:
