@@ -7,6 +7,7 @@ from rasterstats import zonal_stats
 from streamlit_folium import st_folium
 import tempfile
 import os
+import json
 
 st.set_page_config(page_title="KML Polygon Generator", layout="centered")
 
@@ -45,7 +46,6 @@ def parse_coords(text):
 # --- Population Calculation from GeoJSON ---
 def estimate_population_from_coords(coords, raster_path):
     try:
-        # Build temporary GeoJSON from parsed coordinates
         poly_geojson = {
             "type": "FeatureCollection",
             "features": [{
@@ -83,23 +83,45 @@ if generate_clicked:
     else:
         st.warning("Please enter some coordinates.")
 
-# --- Results Section ---
+# --- Results ---
 if "coords" in st.session_state:
     coords = st.session_state["coords"]
 
-    # --- Generate KML ---
+    # --- KML Generation ---
     kml = simplekml.Kml()
     kml.newpolygon(name="My Polygon", outerboundaryis=coords)
     kml_bytes = kml.kml().encode("utf-8")
 
-    # --- Download Button ---
-    col1, col2, col3 = st.columns([1, 2, 1])
-    with col2:
+    # --- GeoJSON Generation ---
+    geojson_data = {
+        "type": "FeatureCollection",
+        "features": [{
+            "type": "Feature",
+            "geometry": {
+                "type": "Polygon",
+                "coordinates": [coords]
+            },
+            "properties": {}
+        }]
+    }
+    geojson_bytes = json.dumps(geojson_data, indent=2).encode("utf-8")
+
+    # --- Download Buttons (Side-by-Side) ---
+    col1, col2, col3 = st.columns([1, 1, 1])
+    with col1:
         st.download_button(
-            label="Download KML File",
+            label="Download KML",
             data=kml_bytes,
             file_name="polygon.kml",
             mime="application/vnd.google-earth.kml+xml",
+            use_container_width=True
+        )
+    with col2:
+        st.download_button(
+            label="Download GeoJSON",
+            data=geojson_bytes,
+            file_name="polygon.geojson",
+            mime="application/geo+json",
             use_container_width=True
         )
 
@@ -112,7 +134,7 @@ if "coords" in st.session_state:
     st_folium(m, width=700, height=500)
 
     # --- Population Estimation ---
-    raster_path = "data/landscan-global-2023.tif"
+    raster_path = "data/landscan-global-2023.tif"  # Update if renamed
     population = estimate_population_from_coords(coords, raster_path)
 
     if population is not None:
