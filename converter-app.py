@@ -196,15 +196,15 @@ if "coords" in st.session_state:
         st_folium(m, width=700, height=400)
 
         # DEBUG WRAPPED POPULATION ESTIMATE
-        raster_path = "data/landscan-global-2023.tif"
-        try:
-            population = estimate_population_from_coords(coords, raster_path)
-            if population is not None:
-                st.success(f"Estimated Population: {population:,.0f}")
-                st.caption("Note: LandScan represents ambient population (24-hour average).")
-        except Exception as e:
-            st.error("An error occurred while estimating population.")
-            st.code(traceback.format_exc())
+    #    raster_path = "data/landscan-global-2023.tif"
+     #   try:
+      #      population = estimate_population_from_coords(coords, raster_path)
+       #     if population is not None:
+        #        st.success(f"Estimated Population: {population:,.0f}")
+         #       st.caption("Note: LandScan represents ambient population (24-hour average).")
+       # except Exception as e:
+        #    st.error("An error occurred while estimating population.")
+         #   st.code(traceback.format_exc())
 
     # --- Skipped Points ---
     if skipped:
