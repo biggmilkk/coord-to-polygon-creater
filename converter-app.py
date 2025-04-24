@@ -9,6 +9,8 @@ import tempfile
 import os
 import json
 
+#Version:v1342.24.4.2025
+
 st.set_page_config(page_title="KML Polygon Generator", layout="centered")
 
 # --- Title ---
@@ -161,16 +163,18 @@ if "coords" in st.session_state:
             use_container_width=True
         )
 
-    # --- Map Preview and Full-Width Population Estimate ---
-    with st.container():
-        st.markdown("<h4 style='text-align: center;'>Polygon Preview</h4>", unsafe_allow_html=True)
-        lon_center = sum([pt[0] for pt in coords]) / len(coords)
-        lat_center = sum([pt[1] for pt in coords]) / len(coords)
-        m = folium.Map(location=[lat_center, lon_center], zoom_start=9, tiles="CartoDB positron")
-        folium.Polygon(locations=[(lat, lon) for lon, lat in coords], color="blue", fill=True).add_to(m)
+    # --- Map Preview and Population Estimate (anchored layout) ---
+    st.markdown("<h4 style='text-align: center;'>Polygon Preview</h4>", unsafe_allow_html=True)
+    lon_center = sum([pt[0] for pt in coords]) / len(coords)
+    lat_center = sum([pt[1] for pt in coords]) / len(coords)
+    m = folium.Map(location=[lat_center, lon_center], zoom_start=9, tiles="CartoDB positron")
+    folium.Polygon(locations=[(lat, lon) for lon, lat in coords], color="blue", fill=True).add_to(m)
+
+    map_anchor = st.empty()
+    with map_anchor.container():
         st_folium(m, width=700, height=400)
 
-        # --- Population Estimate (full-width) ---
+        # Population Estimate (directly below map)
         raster_path = "data/landscan-global-2023.tif"
         population = estimate_population_from_coords(coords, raster_path)
         if population is not None:
