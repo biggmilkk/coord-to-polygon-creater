@@ -170,14 +170,13 @@ if "coords" in st.session_state:
 
     with st.container():
         st_folium(m, width=700, height=400)
+        st.markdown("<div style='margin-top: -10px'></div>", unsafe_allow_html=True)
 
     raster_path = "data/landscan-global-2023.tif"
     population = estimate_population_from_coords(coords, raster_path)
     if population is not None:
-        st.markdown("<div style='margin-top: -12px'></div>", unsafe_allow_html=True)
         st.success(f"Estimated Population: {population:,.0f}")
-        st.caption("Note: LandScan represents ambient population (24-hour average).")
-
+        st.caption("LandScan represents ambient population (24-hour average).")
 
 # --- Attribution ---
 st.markdown("---")
