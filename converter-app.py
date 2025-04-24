@@ -9,6 +9,8 @@ import tempfile
 import os
 import json
 
+#Version:v.1436.24.4.2025
+
 st.set_page_config(page_title="KML Polygon Generator", layout="centered")
 
 # --- Title ---
@@ -39,14 +41,16 @@ def parse_coords(text):
     text = text.replace("′", "'").replace("″", "\"").replace("“", "\"").replace("”", "\"")
     tokens = re.findall(r"[^\s]+", text)
     coords = []
+    skipped = []
     i = 0
 
     while i < len(tokens) - 1:
+        pair = tokens[i:i+8]  # enough tokens to try most patterns
         try:
-            pair = " ".join(tokens[i:i+4])
+            joined = " ".join(pair)
 
             # Try DMS
-            dms_matches = re.findall(r"(\d+)°\s*(\d+)'[\s]*([\d.]+)\"?\s*([NSEW])", pair, re.IGNORECASE)
+            dms_matches = re.findall(r"(\d+)°\s*(\d+)'[\s]*([\d.]+)\"?\s*([NSEW])", joined, re.IGNORECASE)
             if len(dms_matches) >= 2:
                 lat = dms_to_dd(*dms_matches[0])
                 lon = dms_to_dd(*dms_matches[1])
@@ -55,7 +59,7 @@ def parse_coords(text):
                 continue
 
             # Try DDM
-            ddm_matches = re.findall(r"(\d+)°\s*([\d.]+)'\s*([NSEW])", pair, re.IGNORECASE)
+            ddm_matches = re.findall(r"(\d+)°\s*([\d.]+)'\s*([NSEW])", joined, re.IGNORECASE)
             if len(ddm_matches) >= 2:
                 lat = ddm_to_dd(*ddm_matches[0])
                 lon = ddm_to_dd(*ddm_matches[1])
@@ -71,7 +75,7 @@ def parse_coords(text):
             continue
 
         except Exception:
-            pass
+            skipped.append(" ".join(tokens[i:i+4]))
         i += 1
 
     # USGS-style fallback if nothing parsed
@@ -87,7 +91,7 @@ def parse_coords(text):
                 pass
             i += 2
 
-    return coords
+    return coords, skipped
 
 # --- Population Estimation ---
 def estimate_population_from_coords(coords, raster_path):
@@ -122,19 +126,21 @@ generate_clicked = st.button("Generate Map", use_container_width=True)
 # --- Parse and Store Coordinates ---
 if generate_clicked:
     if raw_input.strip():
-        parsed_coords = parse_coords(raw_input)
+        parsed_coords, skipped_points = parse_coords(raw_input)
         if len(parsed_coords) < 3:
             st.error(f"Only detected {len(parsed_coords)} valid points — need at least 3 to form a polygon.")
         else:
             if parsed_coords[0] != parsed_coords[-1]:
                 parsed_coords.append(parsed_coords[0])
             st.session_state["coords"] = parsed_coords
+            st.session_state["skipped"] = skipped_points
     else:
         st.warning("Please enter some coordinates.")
 
 # --- Main Output ---
 if "coords" in st.session_state:
     coords = st.session_state["coords"]
+    skipped = st.session_state.get("skipped", [])
 
     # KML
     kml = simplekml.Kml()
@@ -174,7 +180,7 @@ if "coords" in st.session_state:
             use_container_width=True
         )
 
-    # --- Map Preview and Population Estimate ---
+    # --- Map + Population Estimate (anchored layout) ---
     st.markdown("<h4 style='text-align: center;'>Polygon Preview</h4>", unsafe_allow_html=True)
     lon_center = sum([pt[0] for pt in coords]) / len(coords)
     lat_center = sum([pt[1] for pt in coords]) / len(coords)
@@ -185,12 +191,18 @@ if "coords" in st.session_state:
     with map_anchor.container():
         st_folium(m, width=700, height=400)
 
-        # Population Estimate (full-width)
+        # Population
         raster_path = "data/landscan-global-2023.tif"
         population = estimate_population_from_coords(coords, raster_path)
         if population is not None:
             st.success(f"Estimated Population: {population:,.0f}")
             st.caption("Note: LandScan represents ambient population (24-hour average).")
+
+    # --- Skipped Points ---
+    if skipped:
+        st.warning(f"Skipped {len(skipped)} unrecognized coordinate group(s):")
+        for point in skipped:
+            st.text(f"• {point}")
 
 # --- Attribution ---
 st.markdown("---")
