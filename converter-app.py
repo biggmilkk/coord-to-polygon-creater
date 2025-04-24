@@ -3,11 +3,12 @@ import simplekml
 import folium
 from streamlit_folium import st_folium
 import re
+import json
 
 st.set_page_config(page_title="KML Polygon Generator", layout="centered")
 
 st.title("Coordinates → KML Polygon Generator")
-st.markdown("Paste coordinates below to generate a polygon, preview on map, and download as KML.")
+st.markdown("Paste coordinates below to generate a polygon, preview on map, and download as KML or GeoJSON.")
 
 raw_input = st.text_area("Coordinates:", placeholder="34.2482, -98.6066\n34.25 -98.40\n3424 9860", height=180)
 
@@ -38,43 +39,47 @@ if st.button("Generate Map"):
         if len(coords) >= 3:
             st.success("Polygon generated.")
 
+            # Generate KML
+            kml = simplekml.Kml()
+            kml.newpolygon(name="My Polygon", outerboundaryis=coords)
+            kml_bytes = kml.kml().encode("utf-8")
+
+            # Generate GeoJSON
+            geojson_data = {
+                "type": "FeatureCollection",
+                "features": [{
+                    "type": "Feature",
+                    "geometry": {
+                        "type": "Polygon",
+                        "coordinates": [coords]
+                    },
+                    "properties": {}
+                }]
+            }
+            geojson_bytes = json.dumps(geojson_data, indent=2).encode("utf-8")
+
             # --- Downloads ---
-col1, col2 = st.columns(2)
+            col1, col2 = st.columns(2)
 
-# KML
-with col1:
-    st.download_button(
-        label="Download KML",
-        data=kml_bytes,
-        file_name="polygon.kml",
-        mime="application/vnd.google-earth.kml+xml",
-        use_container_width=True
-    )
+            with col1:
+                st.download_button(
+                    label="Download KML",
+                    data=kml_bytes,
+                    file_name="polygon.kml",
+                    mime="application/vnd.google-earth.kml+xml",
+                    use_container_width=True
+                )
 
-# GeoJSON
-geojson_data = {
-    "type": "FeatureCollection",
-    "features": [{
-        "type": "Feature",
-        "geometry": {
-            "type": "Polygon",
-            "coordinates": [coords]
-        },
-        "properties": {}
-    }]
-}
-import json
-geojson_bytes = json.dumps(geojson_data, indent=2).encode("utf-8")
+            with col2:
+                st.download_button(
+                    label="Download GeoJSON",
+                    data=geojson_bytes,
+                    file_name="polygon.geojson",
+                    mime="application/geo+json",
+                    use_container_width=True
+                )
 
-with col2:
-    st.download_button(
-        label="Download GeoJSON",
-        data=geojson_bytes,
-        file_name="polygon.geojson",
-        mime="application/geo+json",
-        use_container_width=True
-    )
-            # Map
+            # Map Preview
             lon_center = sum(pt[0] for pt in coords) / len(coords)
             lat_center = sum(pt[1] for pt in coords) / len(coords)
             m = folium.Map(location=[lat_center, lon_center], zoom_start=8)
