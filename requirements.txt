@@ -2,3 +2,5 @@ streamlit
 simplekml
 folium
 streamlit-folium
+geopandas
+rasterstats
