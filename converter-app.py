@@ -12,30 +12,43 @@ This app will convert them into a polygon and let you download a KML file for us
 🔁 Format: Each coordinate pair is in hundredths of degrees (e.g. `3906 10399` → 39.06°N, -103.99°W)
 """)
 
-# Input
+# Text input
 raw_input = st.text_area("Enter LAT...LON formatted coordinates:", height=200)
 
 def parse_coords(text):
-    nums = re.findall(r'\d{4}', text)
+    tokens = re.findall(r'\d+', text)
     coords = []
-    for i in range(0, len(nums), 2):
+    i = 0
+    while i < len(tokens) - 1:
+        lat_raw = tokens[i]
+        lon_raw = tokens[i+1]
+
         try:
-            lat = int(nums[i]) / 100.0
-            lon = -int(nums[i+1]) / 100.0  # Assume western hemisphere
-            coords.append((lon, lat))  # KML format: (lon, lat)
-        except IndexError:
-            continue  # Skip incomplete pairs
+            # Latitude: always 4 digits
+            lat = int(lat_raw) / 100.0
+
+            # Longitude: assume 4 or 5 digits, always negative (western hemisphere)
+            lon = -int(lon_raw) / 100.0
+
+            coords.append((lon, lat))  # KML wants (lon, lat)
+        except ValueError:
+            continue  # skip bad pairs
+
+        i += 2
+
+    # Close polygon if not already closed
     if coords and coords[0] != coords[-1]:
-        coords.append(coords[0])  # Close the polygon
+        coords.append(coords[0])
+
     return coords
 
-# Generate KML
+# Button to trigger KML generation
 if st.button("Generate KML"):
     if raw_input:
         try:
             coords = parse_coords(raw_input)
             if len(coords) < 4:
-                st.error("You need at least 3 points (4 including the closing point) to form a polygon.")
+                st.error("You need at least 3 points (plus 1 to close the polygon) to form a valid shape.")
             else:
                 kml = simplekml.Kml()
                 kml.newpolygon(name="My Polygon", outerboundaryis=coords)
