@@ -60,13 +60,14 @@ if "coords" in st.session_state:
     kml.newpolygon(name="My Polygon", outerboundaryis=coords)
     kml_bytes = kml.kml().encode("utf-8")
 
-    # --- Download Section ---
-    st.success("KML polygon created!")
+    st.markdown("<hr>", unsafe_allow_html=True)
+    st.markdown("<h4 style='text-align: center;'>KML Output</h4>", unsafe_allow_html=True)
 
+    # --- Centered Download Button ---
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
         st.download_button(
-            label="⬇Download KML File",
+            label="Download KML File",
             data=kml_bytes,
             file_name="polygon.kml",
             mime="application/vnd.google-earth.kml+xml",
@@ -74,7 +75,7 @@ if "coords" in st.session_state:
         )
 
     # --- Map Preview ---
-    st.markdown("### 🗺️ Polygon Preview Map")
+    st.markdown("<h4 style='text-align: center;'>Polygon Preview Map</h4>", unsafe_allow_html=True)
     lon_center = sum([pt[0] for pt in coords]) / len(coords)
     lat_center = sum([pt[1] for pt in coords]) / len(coords)
     m = folium.Map(location=[lat_center, lon_center], zoom_start=9, tiles="CartoDB positron")
