@@ -161,7 +161,7 @@ if "coords" in st.session_state:
             use_container_width=True
         )
 
-    # --- Map Preview and Population Estimate ---
+    # --- Map Preview and Full-Width Population Estimate ---
     with st.container():
         st.markdown("<h4 style='text-align: center;'>Polygon Preview</h4>", unsafe_allow_html=True)
         lon_center = sum([pt[0] for pt in coords]) / len(coords)
@@ -170,14 +170,12 @@ if "coords" in st.session_state:
         folium.Polygon(locations=[(lat, lon) for lon, lat in coords], color="blue", fill=True).add_to(m)
         st_folium(m, width=700, height=400)
 
-        # --- Force layout rendering for population estimate ---
-        center_col = st.columns([1, 2, 1])[1]  # center alignment
-        with center_col:
-            raster_path = "data/landscan-global-2023.tif"
-            population = estimate_population_from_coords(coords, raster_path)
-            if population is not None:
-                st.success(f"Estimated Population: {population:,.0f}")
-                st.caption("Note: LandScan represents ambient population (24-hour average).")
+        # --- Population Estimate (full-width) ---
+        raster_path = "data/landscan-global-2023.tif"
+        population = estimate_population_from_coords(coords, raster_path)
+        if population is not None:
+            st.success(f"Estimated Population: {population:,.0f}")
+            st.caption("Note: LandScan represents ambient population (24-hour average).")
 
 # --- Attribution ---
 st.markdown("---")
