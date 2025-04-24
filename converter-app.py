@@ -37,15 +37,10 @@ def ddm_to_dd(deg, min_, direction):
 
 def auto_format_text(text):
     text = text.replace("′", "'").replace("″", "\"").replace("“", "\"").replace("”", "\"")
-    text = text.replace("''", "\"")  # unify quote style
-
-    # Add space before direction (e.g. 34.5N → 34.5 N)
+    text = text.replace("''", "\"")
     text = re.sub(r"(\d)([NSEW])", r"\1 \2", text, flags=re.IGNORECASE)
-
-    # Add spacing between DMS units if missing (e.g. 34°14' → 34° 14')
     text = re.sub(r"(\d+)°(\d+)'", r"\1° \2'", text)
     text = re.sub(r"(\d+)'(\d+)", r"\1' \2", text)
-
     return text
 
 def parse_coords(text):
@@ -60,7 +55,7 @@ def parse_coords(text):
         try:
             joined = " ".join(pair)
 
-            # DMS match
+            # DMS
             dms_matches = re.findall(r"(\d+)°\s*(\d+)'[\s]*([\d.]+)\"?\s*([NSEW])", joined, re.IGNORECASE)
             if len(dms_matches) >= 2:
                 lat = dms_to_dd(*dms_matches[0])
@@ -69,7 +64,7 @@ def parse_coords(text):
                 i += 8
                 continue
 
-            # DDM match
+            # DDM
             ddm_matches = re.findall(r"(\d+)°\s*([\d.]+)'\s*([NSEW])", joined, re.IGNORECASE)
             if len(ddm_matches) >= 2:
                 lat = ddm_to_dd(*ddm_matches[0])
@@ -122,6 +117,7 @@ def estimate_population_from_coords(coords, raster_path):
 
         with tempfile.NamedTemporaryFile(delete=False, suffix=".geojson", mode="w") as tmp:
             gdf = gpd.GeoDataFrame.from_features(poly_geojson["features"])
+            gdf.set_crs("EPSG:4326", inplace=True)  # ✅ Set CRS explicitly
             gdf.to_file(tmp.name, driver="GeoJSON")
             tmp_path = tmp.name
 
