@@ -9,6 +9,8 @@ import tempfile
 import os
 import json
 
+#Version:v.1256.24.4.2025
+
 st.set_page_config(page_title="KML Polygon Generator", layout="centered")
 
 # --- Title ---
@@ -40,7 +42,6 @@ def parse_coords(text):
     coords = []
     i = 0
 
-    # DMS and DDM regex
     dms_pattern = re.compile(r"(\d+)°\s*(\d+)'[\s]*([\d.]+)(?:\"|''|″)?\s*([NSEW])", re.IGNORECASE)
     ddm_pattern = re.compile(r"(\d+)°\s*([\d.]+)'\s*([NSEW])", re.IGNORECASE)
 
@@ -61,7 +62,6 @@ def parse_coords(text):
             coords.append((lon, lat))
         return coords
 
-    # Fallback: decimal or 3906 format
     tokens = re.findall(r'-?\d+\.?\d*', text)
     while i < len(tokens) - 1:
         try:
@@ -76,11 +76,9 @@ def parse_coords(text):
             pass
         i += 2
 
-    if coords and coords[0] != coords[-1]:
-        coords.append(coords[0])
     return coords
 
-# --- Population Calculation ---
+# --- Population Estimation ---
 def estimate_population_from_coords(coords, raster_path):
     try:
         poly_geojson = {
@@ -107,29 +105,32 @@ def estimate_population_from_coords(coords, raster_path):
         st.error(f"Error estimating population: {e}")
         return None
 
-# --- Generate Button (Full Width) ---
+# --- Generate Button ---
 generate_clicked = st.button("Generate Map", use_container_width=True)
 
-# --- Results Block ---
+# --- Parse and Store Coordinates ---
 if generate_clicked:
     if raw_input.strip():
         parsed_coords = parse_coords(raw_input)
-        if len(parsed_coords) < 4:
-            st.error(f"Only detected {len(parsed_coords)} points — need at least 3 to form a polygon.")
+        if len(parsed_coords) < 3:
+            st.error(f"Only detected {len(parsed_coords)} valid points — need at least 3 to form a polygon.")
         else:
+            if parsed_coords[0] != parsed_coords[-1]:
+                parsed_coords.append(parsed_coords[0])
             st.session_state["coords"] = parsed_coords
     else:
         st.warning("Please enter some coordinates.")
 
+# --- Main Output ---
 if "coords" in st.session_state:
     coords = st.session_state["coords"]
 
-    # --- Generate KML ---
+    # KML
     kml = simplekml.Kml()
     kml.newpolygon(name="My Polygon", outerboundaryis=coords)
     kml_bytes = kml.kml().encode("utf-8")
 
-    # --- Generate GeoJSON ---
+    # GeoJSON
     geojson_data = {
         "type": "FeatureCollection",
         "features": [{
@@ -143,7 +144,7 @@ if "coords" in st.session_state:
     }
     geojson_bytes = json.dumps(geojson_data, indent=2).encode("utf-8")
 
-    # --- Download Buttons (Full Width)
+    # --- Downloads ---
     col1, col2 = st.columns(2)
     with col1:
         st.download_button(
@@ -168,12 +169,11 @@ if "coords" in st.session_state:
     lat_center = sum([pt[1] for pt in coords]) / len(coords)
     m = folium.Map(location=[lat_center, lon_center], zoom_start=9, tiles="CartoDB positron")
     folium.Polygon(locations=[(lat, lon) for lon, lat in coords], color="blue", fill=True).add_to(m)
-    st_folium(m, width=700, height=400)  # reduced height for spacing
+    st_folium(m, width=700, height=400)
 
-    # --- Population Estimation ---
+    # --- Population ---
     raster_path = "data/landscan-global-2023.tif"
     population = estimate_population_from_coords(coords, raster_path)
-
     if population is not None:
         st.markdown(
             f"<h4 style='text-align: center;'>Estimated Population: {population:,.0f}</h4>",
