@@ -13,7 +13,7 @@ st.set_page_config(page_title="KML Polygon Generator", layout="centered")
 # --- Title ---
 st.markdown("<h2 style='text-align: center;'>Coordinates → KML Polygon Generator</h2>", unsafe_allow_html=True)
 st.markdown(
-    "<p style='text-align: center; font-size: 0.9rem; color: grey;'>Paste coordinates below to generate a KML polygon, view it on a map, and estimate population from LandScan data.</p>",
+    "<p style='text-align: center; font-size: 0.9rem; color: grey;'>Paste coordinates below to generate a KML polygon, view it on a map, and estimate population using LandScan data.</p>",
     unsafe_allow_html=True
 )
 
@@ -34,7 +34,7 @@ def parse_coords(text):
         try:
             lat = int(tokens[i]) / 100.0
             lon = -int(tokens[i + 1]) / 100.0
-            coords.append((lon, lat))  # KML + folium: (lon, lat)
+            coords.append((lon, lat))  # folium and KML use (lon, lat)
         except ValueError:
             pass
         i += 2
@@ -45,7 +45,7 @@ def parse_coords(text):
 # --- Population Calculation from GeoJSON ---
 def estimate_population_from_coords(coords, raster_path):
     try:
-        # Create a temporary GeoJSON from coordinates
+        # Build temporary GeoJSON from parsed coordinates
         poly_geojson = {
             "type": "FeatureCollection",
             "features": [{
@@ -70,7 +70,7 @@ def estimate_population_from_coords(coords, raster_path):
         st.error(f"Error estimating population: {e}")
         return None
 
-# --- KML Button ---
+# --- Generate Button ---
 generate_clicked = st.button("Generate KML", use_container_width=True)
 
 if generate_clicked:
@@ -83,11 +83,11 @@ if generate_clicked:
     else:
         st.warning("Please enter some coordinates.")
 
-# --- Results ---
+# --- Results Section ---
 if "coords" in st.session_state:
     coords = st.session_state["coords"]
 
-    # --- KML Generation ---
+    # --- Generate KML ---
     kml = simplekml.Kml()
     kml.newpolygon(name="My Polygon", outerboundaryis=coords)
     kml_bytes = kml.kml().encode("utf-8")
@@ -112,10 +112,18 @@ if "coords" in st.session_state:
     st_folium(m, width=700, height=500)
 
     # --- Population Estimation ---
-    landsan_raster = "./landscan_2022.tif"  # Update this path
-    population = estimate_population_from_coords(coords, landsan_raster)
+    raster_path = "data/landscan_2023.tif"  # Update to match file location
+    population = estimate_population_from_coords(coords, raster_path)
 
     if population is not None:
         st.markdown("<h4 style='text-align: center;'>Estimated Population</h4>", unsafe_allow_html=True)
         st.success(f"Estimated Population: {population:,.0f}")
         st.caption("Note: LandScan represents ambient population (24-hour average).")
+
+# --- Attribution ---
+st.markdown("---")
+st.markdown(
+    "<p style='font-size: 0.8rem; text-align: center; color: grey;'>Population data © Oak Ridge National Laboratory. "
+    "Distributed under <a href='https://creativecommons.org/licenses/by/4.0/' target='_blank'>CC BY 4.0</a>.</p>",
+    unsafe_allow_html=True
+)
