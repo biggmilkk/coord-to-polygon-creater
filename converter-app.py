@@ -9,22 +9,20 @@ import tempfile
 import os
 import json
 
-#Version:v1342.24.4.2025
-
 st.set_page_config(page_title="KML Polygon Generator", layout="centered")
 
 # --- Title ---
 st.markdown("<h2 style='text-align: center;'>Coordinates → KML Polygon Generator</h2>", unsafe_allow_html=True)
 st.markdown(
-    "<p style='text-align: center; font-size: 0.9rem; color: grey;'>Paste coordinates below to generate a polygon, preview it on a map, download KML & GeoJSON, and estimate population using LandScan data.</p>",
+    "<p style='text-align: center; font-size: 0.9rem; color: grey;'>Paste coordinates below (mixed formats allowed) to generate a polygon, preview it on a map, download KML & GeoJSON, and estimate population using LandScan data.</p>",
     unsafe_allow_html=True
 )
 
 # --- Input ---
 raw_input = st.text_area(
     "Coordinates:",
-    placeholder="Example: 34.2482, -98.6066\n34° 14' 53.52'' N 98° 36' 23.76'' W",
-    height=150,
+    placeholder="Example: 34.2482, -98.6066\n34° 14' 53.52'' N 98° 36' 23.76'' W\n3424 9860",
+    height=180,
     key="coord_input"
 )
 
@@ -38,43 +36,56 @@ def ddm_to_dd(deg, min_, direction):
     return -dd if direction.upper() in ["S", "W"] else dd
 
 def parse_coords(text):
-    text = text.replace(",", " ").replace("′", "'").replace("''", "\"").replace("“", "\"").replace("”", "\"")
+    text = text.replace("′", "'").replace("″", "\"").replace("“", "\"").replace("”", "\"")
+    tokens = re.findall(r"[^\s]+", text)
     coords = []
     i = 0
 
-    dms_pattern = re.compile(r"(\d+)°\s*(\d+)'[\s]*([\d.]+)(?:\"|''|″)?\s*([NSEW])", re.IGNORECASE)
-    ddm_pattern = re.compile(r"(\d+)°\s*([\d.]+)'\s*([NSEW])", re.IGNORECASE)
-
-    dms_matches = dms_pattern.findall(text)
-    ddm_matches = ddm_pattern.findall(text)
-
-    if dms_matches and len(dms_matches) % 2 == 0:
-        for j in range(0, len(dms_matches), 2):
-            lat = dms_to_dd(*dms_matches[j])
-            lon = dms_to_dd(*dms_matches[j + 1])
-            coords.append((lon, lat))
-        return coords
-
-    if ddm_matches and len(ddm_matches) % 2 == 0:
-        for j in range(0, len(ddm_matches), 2):
-            lat = ddm_to_dd(*ddm_matches[j])
-            lon = ddm_to_dd(*ddm_matches[j + 1])
-            coords.append((lon, lat))
-        return coords
-
-    tokens = re.findall(r'-?\d+\.?\d*', text)
     while i < len(tokens) - 1:
         try:
+            pair = " ".join(tokens[i:i+4])
+
+            # Try DMS
+            dms_matches = re.findall(r"(\d+)°\s*(\d+)'[\s]*([\d.]+)\"?\s*([NSEW])", pair, re.IGNORECASE)
+            if len(dms_matches) >= 2:
+                lat = dms_to_dd(*dms_matches[0])
+                lon = dms_to_dd(*dms_matches[1])
+                coords.append((lon, lat))
+                i += 8
+                continue
+
+            # Try DDM
+            ddm_matches = re.findall(r"(\d+)°\s*([\d.]+)'\s*([NSEW])", pair, re.IGNORECASE)
+            if len(ddm_matches) >= 2:
+                lat = ddm_to_dd(*ddm_matches[0])
+                lon = ddm_to_dd(*ddm_matches[1])
+                coords.append((lon, lat))
+                i += 6
+                continue
+
+            # Try Decimal Degrees
             lat = float(tokens[i])
             lon = float(tokens[i + 1])
-            if abs(lat) > 90:
-                lat = lat / 100.0
-            if abs(lon) > 180:
-                lon = -abs(lon / 100.0)
             coords.append((lon, lat))
-        except ValueError:
+            i += 2
+            continue
+
+        except Exception:
             pass
-        i += 2
+        i += 1
+
+    # USGS-style fallback if nothing parsed
+    if not coords:
+        ints = re.findall(r'\d+', text)
+        i = 0
+        while i < len(ints) - 1:
+            try:
+                lat = int(ints[i]) / 100.0
+                lon = -int(ints[i + 1]) / 100.0
+                coords.append((lon, lat))
+            except ValueError:
+                pass
+            i += 2
 
     return coords
 
@@ -174,7 +185,7 @@ if "coords" in st.session_state:
     with map_anchor.container():
         st_folium(m, width=700, height=400)
 
-        # Population Estimate
+        # Population Estimate (full-width)
         raster_path = "data/landscan-global-2023.tif"
         population = estimate_population_from_coords(coords, raster_path)
         if population is not None:
