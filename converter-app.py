@@ -71,8 +71,8 @@ def estimate_population_from_coords(coords, raster_path):
         return None
 
 # --- Generate Button Centered ---
-generate_col = st.columns([1, 2, 1])[1]
-with generate_col:
+generate_cols = st.columns([1, 2, 1])
+with generate_cols[1]:
     generate_clicked = st.button("Generate Map", use_container_width=True)
 
 # --- Results Block ---
