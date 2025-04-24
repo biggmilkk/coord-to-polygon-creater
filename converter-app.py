@@ -39,7 +39,9 @@ def parse_coords(text):
     return coords
 
 # --- Button to trigger generation ---
-if st.button("Generate KML"):
+generate_clicked = st.button("🚀 Generate KML", use_container_width=True)
+
+if generate_clicked:
     if raw_input.strip():
         parsed_coords = parse_coords(raw_input)
         if len(parsed_coords) < 4:
@@ -58,14 +60,18 @@ if "coords" in st.session_state:
     kml.newpolygon(name="My Polygon", outerboundaryis=coords)
     kml_bytes = kml.kml().encode("utf-8")
 
+    # --- Download Section ---
     st.success("✅ KML polygon created!")
-    st.download_button(
-        label="📥 Download KML File",
-        data=kml_bytes,
-        file_name="polygon.kml",
-        mime="application/vnd.google-earth.kml+xml",
-        use_container_width=True
-    )
+
+    col1, col2, col3 = st.columns([1, 2, 1])
+    with col2:
+        st.download_button(
+            label="⬇️ Download KML File",
+            data=kml_bytes,
+            file_name="polygon.kml",
+            mime="application/vnd.google-earth.kml+xml",
+            use_container_width=True
+        )
 
     # --- Map Preview ---
     st.markdown("### 🗺️ Polygon Preview Map")
