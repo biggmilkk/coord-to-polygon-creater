@@ -38,7 +38,7 @@ def parse_coords(text):
     return coords
 
 # --- Button to trigger processing ---
-if st.button("Generate KML and Map"):
+if st.button("Generate KML"):
     if raw_input.strip():
         coords = parse_coords(raw_input)
 
