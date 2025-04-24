@@ -7,7 +7,7 @@ from streamlit_folium import st_folium
 st.set_page_config(page_title="KML Polygon Generator", layout="centered")
 
 # --- Title ---
-st.markdown("<h2 style='text-align: center;'>LAT...LON → KML Polygon Generator</h2>", unsafe_allow_html=True)
+st.markdown("<h2 style='text-align: center;'> Coordinates → KML Polygon Generator</h2>", unsafe_allow_html=True)
 st.markdown(
     "<p style='text-align: center; font-size: 0.9rem; color: grey;'>Paste your coordinates below to visualize and export a KML polygon.</p>",
     unsafe_allow_html=True
@@ -15,8 +15,8 @@ st.markdown(
 
 # --- Input ---
 raw_input = st.text_area(
-    "📍 LAT...LON coordinates:",
-    placeholder="Example: 3906 10399 3924 10393 3921 10357 3902 10361",
+    "📍 Coordinates:",
+    placeholder="Example: LAT...LON 3906 10399 3924 10393 3921 10357 3902 10361",
     height=150
 )
 
