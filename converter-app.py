@@ -15,7 +15,7 @@ st.markdown(
 
 # --- Input ---
 raw_input = st.text_area(
-    "📍 Coordinates:",
+    "Coordinates:",
     placeholder="Example: LAT...LON 3906 10399 3924 10393 3921 10357 3902 10361",
     height=150,
     key="coord_input"
@@ -39,11 +39,11 @@ def parse_coords(text):
     return coords
 
 # --- Button to trigger generation ---
-if st.button("Generate KML and Map"):
+if st.button("Generate KML"):
     if raw_input.strip():
         parsed_coords = parse_coords(raw_input)
         if len(parsed_coords) < 4:
-            st.error("🚫 Not enough points to form a polygon.")
+            st.error("Not enough points to form a polygon.")
         else:
             st.session_state["coords"] = parsed_coords
     else:
