@@ -8,6 +8,7 @@ from streamlit_folium import st_folium
 import tempfile
 import os
 import json
+import traceback
 
 st.set_page_config(page_title="KML Polygon Generator", layout="centered")
 
@@ -102,30 +103,26 @@ def parse_coords(text):
 
 # --- Population Estimation ---
 def estimate_population_from_coords(coords, raster_path):
-    try:
-        poly_geojson = {
-            "type": "FeatureCollection",
-            "features": [{
-                "type": "Feature",
-                "geometry": {
-                    "type": "Polygon",
-                    "coordinates": [coords]
-                },
-                "properties": {}
-            }]
-        }
+    poly_geojson = {
+        "type": "FeatureCollection",
+        "features": [{
+            "type": "Feature",
+            "geometry": {
+                "type": "Polygon",
+                "coordinates": [coords]
+            },
+            "properties": {}
+        }]
+    }
 
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".geojson", mode="w") as tmp:
-            gdf = gpd.GeoDataFrame.from_features(poly_geojson["features"], crs="EPSG:4326")
-            gdf.to_file(tmp.name, driver="GeoJSON")
-            tmp_path = tmp.name
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".geojson", mode="w") as tmp:
+        gdf = gpd.GeoDataFrame.from_features(poly_geojson["features"], crs="EPSG:4326")
+        gdf.to_file(tmp.name, driver="GeoJSON")
+        tmp_path = tmp.name
 
-        stats = zonal_stats(tmp_path, raster_path, stats=["sum"])
-        os.unlink(tmp_path)
-        return stats[0]["sum"]
-    except Exception as e:
-        st.error(f"Error estimating population: {e}")
-        return None
+    stats = zonal_stats(tmp_path, raster_path, stats=["sum"])
+    os.unlink(tmp_path)
+    return stats[0]["sum"]
 
 # --- Generate Button ---
 generate_clicked = st.button("Generate Map", use_container_width=True)
@@ -198,11 +195,16 @@ if "coords" in st.session_state:
     with map_anchor.container():
         st_folium(m, width=700, height=400)
 
+        # DEBUG WRAPPED POPULATION ESTIMATE
         raster_path = "data/landscan-global-2023.tif"
-        population = estimate_population_from_coords(coords, raster_path)
-        if population is not None:
-            st.success(f"Estimated Population: {population:,.0f}")
-            st.caption("Note: LandScan represents ambient population (24-hour average).")
+        try:
+            population = estimate_population_from_coords(coords, raster_path)
+            if population is not None:
+                st.success(f"Estimated Population: {population:,.0f}")
+                st.caption("Note: LandScan represents ambient population (24-hour average).")
+        except Exception as e:
+            st.error("An error occurred while estimating population.")
+            st.code(traceback.format_exc())
 
     # --- Skipped Points ---
     if skipped:
