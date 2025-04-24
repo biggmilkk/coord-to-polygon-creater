@@ -38,12 +38,42 @@ if st.button("Generate Map"):
         if len(coords) >= 3:
             st.success("Polygon generated.")
 
-            # Download KML
-            kml = simplekml.Kml()
-            kml.newpolygon(name="My Polygon", outerboundaryis=coords)
-            kml_bytes = kml.kml().encode("utf-8")
-            st.download_button("Download KML", kml_bytes, "polygon.kml", mime="application/vnd.google-earth.kml+xml")
+            # --- Downloads ---
+col1, col2 = st.columns(2)
 
+# KML
+with col1:
+    st.download_button(
+        label="Download KML",
+        data=kml_bytes,
+        file_name="polygon.kml",
+        mime="application/vnd.google-earth.kml+xml",
+        use_container_width=True
+    )
+
+# GeoJSON
+geojson_data = {
+    "type": "FeatureCollection",
+    "features": [{
+        "type": "Feature",
+        "geometry": {
+            "type": "Polygon",
+            "coordinates": [coords]
+        },
+        "properties": {}
+    }]
+}
+import json
+geojson_bytes = json.dumps(geojson_data, indent=2).encode("utf-8")
+
+with col2:
+    st.download_button(
+        label="Download GeoJSON",
+        data=geojson_bytes,
+        file_name="polygon.geojson",
+        mime="application/geo+json",
+        use_container_width=True
+    )
             # Map
             lon_center = sum(pt[0] for pt in coords) / len(coords)
             lat_center = sum(pt[1] for pt in coords) / len(coords)
