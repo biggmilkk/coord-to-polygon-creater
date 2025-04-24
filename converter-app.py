@@ -31,21 +31,21 @@ raw_input = st.text_area(
 # --- Parse Function ---
 def dms_to_dd(deg, min_, sec, direction):
     dd = float(deg) + float(min_) / 60 + float(sec) / 3600
-    return -dd if direction in ["S", "W"] else dd
+    return -dd if direction.upper() in ["S", "W"] else dd
 
 def ddm_to_dd(deg, min_, direction):
     dd = float(deg) + float(min_) / 60
-    return -dd if direction in ["S", "W"] else dd
+    return -dd if direction.upper() in ["S", "W"] else dd
 
 def parse_coords(text):
-    text = text.replace(",", " ")
+    text = text.replace(",", " ").replace("′", "'").replace("''", "\"").replace("“", "\"").replace("”", "\"")
     tokens = re.findall(r'-?\d+\.?\d*|[NSEW]', text)
     coords = []
     i = 0
 
-    # --- DMS / DDM Regex ---
-    dms_pattern = re.compile(r"(\d+)°\s*(\d+)'\s*(\d+(?:\.\d+)?)\"?\s*([NSEW])")
-    ddm_pattern = re.compile(r"(\d+)°\s*(\d+\.\d+)'?\s*([NSEW])")
+    # --- Improved DMS / DDM Regex ---
+    dms_pattern = re.compile(r"(\d+)°\s*(\d+)'[\s]*([\d.]+)\"?\s*([NSEW])", re.IGNORECASE)
+    ddm_pattern = re.compile(r"(\d+)°\s*([\d.]+)'\s*([NSEW])", re.IGNORECASE)
 
     dms_matches = dms_pattern.findall(text)
     ddm_matches = ddm_pattern.findall(text)
@@ -64,7 +64,7 @@ def parse_coords(text):
             coords.append((lon, lat))
         return coords
 
-    # --- Fallback: Decimal or scaled int format ---
+    # --- Fallback: Decimal degrees or 3906-style ints ---
     while i < len(tokens) - 1:
         try:
             lat = float(tokens[i])
@@ -83,7 +83,6 @@ def parse_coords(text):
     if coords and coords[0] != coords[-1]:
         coords.append(coords[0])
     return coords
-
 
     # --- Default fallback (Decimal degrees or 3906/10399 format) ---
     while i < len(tokens) - 1:
