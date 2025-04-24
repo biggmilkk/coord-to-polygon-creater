@@ -116,8 +116,7 @@ def estimate_population_from_coords(coords, raster_path):
         }
 
         with tempfile.NamedTemporaryFile(delete=False, suffix=".geojson", mode="w") as tmp:
-            gdf = gpd.GeoDataFrame.from_features(poly_geojson["features"])
-            gdf.set_crs("EPSG:4326", inplace=True)  # ✅ Set CRS explicitly
+            gdf = gpd.GeoDataFrame.from_features(poly_geojson["features"], crs="EPSG:4326")
             gdf.to_file(tmp.name, driver="GeoJSON")
             tmp_path = tmp.name
 
