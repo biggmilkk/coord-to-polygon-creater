@@ -161,21 +161,22 @@ if "coords" in st.session_state:
             use_container_width=True
         )
 
-    # --- Map Preview ---
-    st.markdown("<h4 style='text-align: center;'>Polygon Preview</h4>", unsafe_allow_html=True)
-    lon_center = sum([pt[0] for pt in coords]) / len(coords)
-    lat_center = sum([pt[1] for pt in coords]) / len(coords)
-    m = folium.Map(location=[lat_center, lon_center], zoom_start=9, tiles="CartoDB positron")
-    folium.Polygon(locations=[(lat, lon) for lon, lat in coords], color="blue", fill=True).add_to(m)
-    st_folium(m, width=700, height=400)
-    st.markdown("<div style='margin-top: -30px'></div>", unsafe_allow_html=True)
+    # --- Map Preview and Population Estimate ---
+    with st.container():
+        st.markdown("<h4 style='text-align: center;'>Polygon Preview</h4>", unsafe_allow_html=True)
+        lon_center = sum([pt[0] for pt in coords]) / len(coords)
+        lat_center = sum([pt[1] for pt in coords]) / len(coords)
+        m = folium.Map(location=[lat_center, lon_center], zoom_start=9, tiles="CartoDB positron")
+        folium.Polygon(locations=[(lat, lon) for lon, lat in coords], color="blue", fill=True).add_to(m)
+        st_folium(m, width=700, height=400)
 
-    # --- Population ---
-    raster_path = "data/landscan-global-2023.tif"
-    population = estimate_population_from_coords(coords, raster_path)
-    if population is not None:
-        st.success(f"Estimated Population: {population:,.0f}")
-        st.caption("Note: LandScan represents ambient population (24-hour average).")
+    # --- Population (now inside the same container) ---
+        raster_path = "data/landscan-global-2023.tif"
+        population = estimate_population_from_coords(coords, raster_path)
+        if population is not None:
+            st.success(f"Estimated Population: {population:,.0f}")
+            st.caption("Note: LandScan represents ambient population (24-hour average).")
+
 
 # --- Attribution ---
 st.markdown("---")
