@@ -9,8 +9,6 @@ import tempfile
 import os
 import json
 
-#Version:v.1256.24.4.2025
-
 st.set_page_config(page_title="KML Polygon Generator", layout="centered")
 
 # --- Title ---
@@ -173,11 +171,11 @@ if "coords" in st.session_state:
     st.markdown("<div style='margin-top: -30px'></div>", unsafe_allow_html=True)
 
     # --- Population ---
-raster_path = "data/landscan-global-2023.tif"
-population = estimate_population_from_coords(coords, raster_path)
-if population is not None:
-    st.success(f"Estimated Population: {population:,.0f}")
-    st.caption("Note: LandScan represents ambient population (24-hour average).")
+    raster_path = "data/landscan-global-2023.tif"
+    population = estimate_population_from_coords(coords, raster_path)
+    if population is not None:
+        st.success(f"Estimated Population: {population:,.0f}")
+        st.caption("Note: LandScan represents ambient population (24-hour average).")
 
 # --- Attribution ---
 st.markdown("---")
