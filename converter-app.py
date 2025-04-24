@@ -9,6 +9,8 @@ import tempfile
 import os
 import json
 
+#Version: v2318.24.4.2025
+
 st.set_page_config(page_title="KML Polygon Generator", layout="centered")
 
 # --- Title ---
