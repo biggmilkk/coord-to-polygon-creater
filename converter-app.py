@@ -44,7 +44,7 @@ def parse_coords(text):
     i = 0
 
     # --- Improved DMS / DDM Regex ---
-    dms_pattern = re.compile(r"(\d+)°\s*(\d+)'[\s]*([\d.]+)\"?\s*([NSEW])", re.IGNORECASE)
+    dms_pattern = re.compile(r"(\d+)°\s*(\d+)'[\s]*([\d.]+)(?:\"|''|″)?\s*([NSEW])", re.IGNORECASE)
     ddm_pattern = re.compile(r"(\d+)°\s*([\d.]+)'\s*([NSEW])", re.IGNORECASE)
 
     dms_matches = dms_pattern.findall(text)
