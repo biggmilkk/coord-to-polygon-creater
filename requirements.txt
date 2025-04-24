@@ -2,3 +2,9 @@ streamlit
 simplekml
 folium
 streamlit-folium
+geopandas
+rasterstats
+rasterio
+fiona
+shapely
+pyproj
