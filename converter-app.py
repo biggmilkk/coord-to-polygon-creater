@@ -72,7 +72,7 @@ if "coords" in st.session_state:
         )
 
     # --- Map Preview ---
-    st.markdown("<h4 style='text-align: center;'>Polygon Preview Map</h4>", unsafe_allow_html=True)
+    st.markdown("<h4 style='text-align: center;'>Polygon Preview</h4>", unsafe_allow_html=True)
     lon_center = sum([pt[0] for pt in coords]) / len(coords)
     lat_center = sum([pt[1] for pt in coords]) / len(coords)
     m = folium.Map(location=[lat_center, lon_center], zoom_start=9, tiles="CartoDB positron")
