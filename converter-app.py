@@ -142,7 +142,7 @@ if "coords" in st.session_state:
     population = estimate_population_from_coords(coords, raster_path)
 
     if population is not None:
-        st.markdown("<h4 style='text-align: center;'>Estimated Population</h4>", unsafe_allow_html=True)
+        st.markdown("<h4 style='text-align: center;'>Population Exposure</h4>", unsafe_allow_html=True)
         st.success(f"Estimated Population: {population:,.0f}")
         st.caption("Note: LandScan represents ambient population (24-hour average).")
 
