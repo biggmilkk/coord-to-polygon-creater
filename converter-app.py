@@ -9,6 +9,8 @@ import tempfile
 import os
 import json
 
+#Version: v.1226.24.4.2025
+
 st.set_page_config(page_title="KML Polygon Generator", layout="centered")
 
 # --- Title ---
@@ -70,10 +72,8 @@ def estimate_population_from_coords(coords, raster_path):
         st.error(f"Error estimating population: {e}")
         return None
 
-# --- Generate Button Centered ---
-generate_cols = st.columns([1, 2, 1])
-with generate_cols[1]:
-    generate_clicked = st.button("Generate Map", use_container_width=True)
+# --- Generate Button (Full Width) ---
+generate_clicked = st.button("Generate Map", use_container_width=True)
 
 # --- Results Block ---
 if generate_clicked:
@@ -108,9 +108,9 @@ if "coords" in st.session_state:
     }
     geojson_bytes = json.dumps(geojson_data, indent=2).encode("utf-8")
 
-    # --- Centered Download Buttons: KML + GeoJSON ---
-    download_row = st.columns([1, 1, 1])
-    with download_row[0]:
+    # --- Side-by-Side Download Buttons (Full Width) ---
+    col1, col2 = st.columns(2)
+    with col1:
         st.download_button(
             label="Download KML",
             data=kml_bytes,
@@ -118,7 +118,7 @@ if "coords" in st.session_state:
             mime="application/vnd.google-earth.kml+xml",
             use_container_width=True
         )
-    with download_row[2]:
+    with col2:
         st.download_button(
             label="Download GeoJSON",
             data=geojson_bytes,
