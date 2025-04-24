@@ -189,6 +189,9 @@ if "coords" in st.session_state:
 
     st.write("Parsed coordinates:", parsed_coords)
     st.write("Count:", len(parsed_coords))
+    if len(parsed_coords) < 4:
+        st.error(f"Only detected {len(parsed_coords)} points — need at least 3 to form a polygon.")
+
     
     # --- Map Preview ---
     st.markdown("<h4 style='text-align: center;'>Polygon Preview</h4>", unsafe_allow_html=True)
