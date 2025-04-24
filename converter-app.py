@@ -9,8 +9,6 @@ import tempfile
 import os
 import json
 
-#Version: v.1226.24.4.2025
-
 st.set_page_config(page_title="KML Polygon Generator", layout="centered")
 
 # --- Title ---
@@ -23,12 +21,12 @@ st.markdown(
 # --- Input ---
 raw_input = st.text_area(
     "Coordinates:",
-    placeholder="Example: LAT...LON 3906 10399 3924 10393 3921 10357 3902 10361",
+    placeholder="Example: 34.2482, -98.6066\n34° 14' 53.52'' N 98° 36' 23.76'' W",
     height=150,
     key="coord_input"
 )
 
-# --- Parse Function ---
+# --- Coordinate Parsers ---
 def dms_to_dd(deg, min_, sec, direction):
     dd = float(deg) + float(min_) / 60 + float(sec) / 3600
     return -dd if direction.upper() in ["S", "W"] else dd
@@ -39,11 +37,10 @@ def ddm_to_dd(deg, min_, direction):
 
 def parse_coords(text):
     text = text.replace(",", " ").replace("′", "'").replace("''", "\"").replace("“", "\"").replace("”", "\"")
-    tokens = re.findall(r'-?\d+\.?\d*|[NSEW]', text)
     coords = []
     i = 0
 
-    # --- Improved DMS / DDM Regex ---
+    # DMS and DDM regex
     dms_pattern = re.compile(r"(\d+)°\s*(\d+)'[\s]*([\d.]+)(?:\"|''|″)?\s*([NSEW])", re.IGNORECASE)
     ddm_pattern = re.compile(r"(\d+)°\s*([\d.]+)'\s*([NSEW])", re.IGNORECASE)
 
@@ -64,17 +61,16 @@ def parse_coords(text):
             coords.append((lon, lat))
         return coords
 
-    # --- Fallback: Decimal degrees or 3906-style ints ---
+    # Fallback: decimal or 3906 format
+    tokens = re.findall(r'-?\d+\.?\d*', text)
     while i < len(tokens) - 1:
         try:
             lat = float(tokens[i])
             lon = float(tokens[i + 1])
-
             if abs(lat) > 90:
                 lat = lat / 100.0
             if abs(lon) > 180:
                 lon = -abs(lon / 100.0)
-
             coords.append((lon, lat))
         except ValueError:
             pass
@@ -84,27 +80,6 @@ def parse_coords(text):
         coords.append(coords[0])
     return coords
 
-    # --- Default fallback (Decimal degrees or 3906/10399 format) ---
-    while i < len(tokens) - 1:
-        try:
-            lat = float(tokens[i])
-            lon = float(tokens[i + 1])
-
-            # Old format check (e.g., 3906 = 39.06)
-            if abs(lat) > 90:
-                lat = lat / 100.0
-            if abs(lon) > 180:
-                lon = -abs(lon / 100.0)
-
-            coords.append((lon, lat))
-        except ValueError:
-            pass
-        i += 2
-
-    if coords and coords[0] != coords[-1]:
-        coords.append(coords[0])
-    return coords
-    
 # --- Population Calculation ---
 def estimate_population_from_coords(coords, raster_path):
     try:
@@ -140,7 +115,7 @@ if generate_clicked:
     if raw_input.strip():
         parsed_coords = parse_coords(raw_input)
         if len(parsed_coords) < 4:
-            st.error("Not enough points to form a polygon.")
+            st.error(f"Only detected {len(parsed_coords)} points — need at least 3 to form a polygon.")
         else:
             st.session_state["coords"] = parsed_coords
     else:
@@ -168,7 +143,7 @@ if "coords" in st.session_state:
     }
     geojson_bytes = json.dumps(geojson_data, indent=2).encode("utf-8")
 
-    # --- Side-by-Side Download Buttons (Full Width) ---
+    # --- Download Buttons (Full Width)
     col1, col2 = st.columns(2)
     with col1:
         st.download_button(
@@ -187,29 +162,23 @@ if "coords" in st.session_state:
             use_container_width=True
         )
 
-    st.write("Parsed coordinates:", parsed_coords)
-    st.write("Count:", len(parsed_coords))
-    if len(parsed_coords) < 4:
-        st.error(f"Only detected {len(parsed_coords)} points — need at least 3 to form a polygon.")
-
-    
     # --- Map Preview ---
     st.markdown("<h4 style='text-align: center;'>Polygon Preview</h4>", unsafe_allow_html=True)
     lon_center = sum([pt[0] for pt in coords]) / len(coords)
     lat_center = sum([pt[1] for pt in coords]) / len(coords)
     m = folium.Map(location=[lat_center, lon_center], zoom_start=9, tiles="CartoDB positron")
     folium.Polygon(locations=[(lat, lon) for lon, lat in coords], color="blue", fill=True).add_to(m)
-    st_folium(m, width=700, height=400)
-    st.markdown("---", unsafe_allow_html=True)
-
+    st_folium(m, width=700, height=400)  # reduced height for spacing
 
     # --- Population Estimation ---
     raster_path = "data/landscan-global-2023.tif"
     population = estimate_population_from_coords(coords, raster_path)
 
     if population is not None:
-        st.markdown("<h4 style='text-align: center;'>Population Exposure</h4>", unsafe_allow_html=True)
-        st.success(f"Estimated Population: {population:,.0f}")
+        st.markdown(
+            f"<h4 style='text-align: center;'>Estimated Population: {population:,.0f}</h4>",
+            unsafe_allow_html=True
+        )
         st.caption("Note: LandScan represents ambient population (24-hour average).")
 
 # --- Attribution ---
