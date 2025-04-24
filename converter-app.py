@@ -169,18 +169,15 @@ if "coords" in st.session_state:
     folium.Polygon(locations=[(lat, lon) for lon, lat in coords], color="blue", fill=True).add_to(m)
 
     with st.container():
-        col_map, col_data = st.columns([3, 2], gap="large")
+        st_folium(m, width=700, height=400)
 
-    with col_map:
-        st_folium(m, width=600, height=400)
+    raster_path = "data/landscan-global-2023.tif"
+    population = estimate_population_from_coords(coords, raster_path)
+    if population is not None:
+        st.markdown("<div style='margin-top: -12px'></div>", unsafe_allow_html=True)
+        st.success(f"Estimated Population: {population:,.0f}")
+        st.caption("Note: LandScan represents ambient population (24-hour average).")
 
-    with col_data:
-        raster_path = "data/landscan-global-2023.tif"
-        population = estimate_population_from_coords(coords, raster_path)
-        if population is not None:
-            st.markdown("### Population Estimate")
-            st.success(f"{population:,.0f}")
-            st.caption("LandScan represents ambient population (24-hour average).")
 
 # --- Attribution ---
 st.markdown("---")
