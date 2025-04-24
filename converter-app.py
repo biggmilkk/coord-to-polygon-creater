@@ -30,13 +30,21 @@ raw_input = st.text_area(
 
 # --- Parse Function ---
 def parse_coords(text):
-    tokens = re.findall(r'\d+', text)
+    text = text.replace(",", " ")  # Normalize comma-separated entries
+    tokens = re.findall(r'-?\d+\.?\d*', text)
     coords = []
     i = 0
     while i < len(tokens) - 1:
         try:
-            lat = int(tokens[i]) / 100.0
-            lon = -int(tokens[i + 1]) / 100.0
+            lat = float(tokens[i])
+            lon = float(tokens[i + 1])
+
+            # If using old-style ints like 3906, convert by dividing by 100
+            if abs(lat) > 90:
+                lat = lat / 100.0
+            if abs(lon) > 180:
+                lon = -abs(lon / 100.0)
+
             coords.append((lon, lat))
         except ValueError:
             pass
@@ -44,7 +52,7 @@ def parse_coords(text):
     if coords and coords[0] != coords[-1]:
         coords.append(coords[0])
     return coords
-
+    
 # --- Population Calculation ---
 def estimate_population_from_coords(coords, raster_path):
     try:
