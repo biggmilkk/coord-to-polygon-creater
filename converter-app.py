@@ -29,17 +29,49 @@ raw_input = st.text_area(
 )
 
 # --- Parse Function ---
+def dms_to_dd(deg, min_, sec, direction):
+    dd = float(deg) + float(min_) / 60 + float(sec) / 3600
+    return -dd if direction in ["S", "W"] else dd
+
+def ddm_to_dd(deg, min_, direction):
+    dd = float(deg) + float(min_) / 60
+    return -dd if direction in ["S", "W"] else dd
+
 def parse_coords(text):
-    text = text.replace(",", " ")  # Normalize comma-separated entries
-    tokens = re.findall(r'-?\d+\.?\d*', text)
+    text = text.replace(",", " ")
+    tokens = re.findall(r'-?\d+\.?\d*|[NSEW]', text)
     coords = []
     i = 0
+    parsed = []
+
+    # --- DMS / DDM Parser ---
+    dms_pattern = re.compile(r"(\d+)°(\d+)'(\d+)[\"′]?\s*([NSEW])")
+    ddm_pattern = re.compile(r"(\d+)°(\d+\.\d+)'?\s*([NSEW])")
+
+    dms_matches = dms_pattern.findall(text)
+    ddm_matches = ddm_pattern.findall(text)
+
+    if dms_matches and len(dms_matches) % 2 == 0:
+        for j in range(0, len(dms_matches), 2):
+            lat = dms_to_dd(*dms_matches[j])
+            lon = dms_to_dd(*dms_matches[j + 1])
+            coords.append((lon, lat))
+        return coords
+
+    if ddm_matches and len(ddm_matches) % 2 == 0:
+        for j in range(0, len(ddm_matches), 2):
+            lat = ddm_to_dd(*ddm_matches[j])
+            lon = ddm_to_dd(*ddm_matches[j + 1])
+            coords.append((lon, lat))
+        return coords
+
+    # --- Default fallback (Decimal degrees or 3906/10399 format) ---
     while i < len(tokens) - 1:
         try:
             lat = float(tokens[i])
             lon = float(tokens[i + 1])
 
-            # If using old-style ints like 3906, convert by dividing by 100
+            # Old format check (e.g., 3906 = 39.06)
             if abs(lat) > 90:
                 lat = lat / 100.0
             if abs(lon) > 180:
@@ -49,6 +81,7 @@ def parse_coords(text):
         except ValueError:
             pass
         i += 2
+
     if coords and coords[0] != coords[-1]:
         coords.append(coords[0])
     return coords
