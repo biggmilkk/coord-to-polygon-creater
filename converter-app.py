@@ -9,8 +9,6 @@ import tempfile
 import os
 import json
 
-#Version:v.1436.24.4.2025
-
 st.set_page_config(page_title="KML Polygon Generator", layout="centered")
 
 # --- Title ---
@@ -23,7 +21,7 @@ st.markdown(
 # --- Input ---
 raw_input = st.text_area(
     "Coordinates:",
-    placeholder="Example: 34.2482, -98.6066\n34° 14' 53.52'' N 98° 36' 23.76'' W\n3424 9860",
+    placeholder="Example: 34.2482, -98.6066\n34°14'53.52\"N 98°36'23.76\"W\n3424 9860",
     height=180,
     key="coord_input"
 )
@@ -37,19 +35,32 @@ def ddm_to_dd(deg, min_, direction):
     dd = float(deg) + float(min_) / 60
     return -dd if direction.upper() in ["S", "W"] else dd
 
-def parse_coords(text):
+def auto_format_text(text):
     text = text.replace("′", "'").replace("″", "\"").replace("“", "\"").replace("”", "\"")
+    text = text.replace("''", "\"")  # unify quote style
+
+    # Add space before direction (e.g. 34.5N → 34.5 N)
+    text = re.sub(r"(\d)([NSEW])", r"\1 \2", text, flags=re.IGNORECASE)
+
+    # Add spacing between DMS units if missing (e.g. 34°14' → 34° 14')
+    text = re.sub(r"(\d+)°(\d+)'", r"\1° \2'", text)
+    text = re.sub(r"(\d+)'(\d+)", r"\1' \2", text)
+
+    return text
+
+def parse_coords(text):
+    text = auto_format_text(text)
     tokens = re.findall(r"[^\s]+", text)
     coords = []
     skipped = []
     i = 0
 
     while i < len(tokens) - 1:
-        pair = tokens[i:i+8]  # enough tokens to try most patterns
+        pair = tokens[i:i+8]
         try:
             joined = " ".join(pair)
 
-            # Try DMS
+            # DMS match
             dms_matches = re.findall(r"(\d+)°\s*(\d+)'[\s]*([\d.]+)\"?\s*([NSEW])", joined, re.IGNORECASE)
             if len(dms_matches) >= 2:
                 lat = dms_to_dd(*dms_matches[0])
@@ -58,7 +69,7 @@ def parse_coords(text):
                 i += 8
                 continue
 
-            # Try DDM
+            # DDM match
             ddm_matches = re.findall(r"(\d+)°\s*([\d.]+)'\s*([NSEW])", joined, re.IGNORECASE)
             if len(ddm_matches) >= 2:
                 lat = ddm_to_dd(*ddm_matches[0])
@@ -67,7 +78,7 @@ def parse_coords(text):
                 i += 6
                 continue
 
-            # Try Decimal Degrees
+            # Decimal degrees
             lat = float(tokens[i])
             lon = float(tokens[i + 1])
             coords.append((lon, lat))
@@ -78,18 +89,19 @@ def parse_coords(text):
             skipped.append(" ".join(tokens[i:i+4]))
         i += 1
 
-    # USGS-style fallback if nothing parsed
-    if not coords:
-        ints = re.findall(r'\d+', text)
-        i = 0
-        while i < len(ints) - 1:
+    # Fallback: USGS-style integers
+    fallback_coords = []
+    ints = re.findall(r'\d{4,5}', text)
+    if len(ints) >= 2:
+        for j in range(0, len(ints) - 1, 2):
             try:
-                lat = int(ints[i]) / 100.0
-                lon = -int(ints[i + 1]) / 100.0
-                coords.append((lon, lat))
-            except ValueError:
-                pass
-            i += 2
+                lat = int(ints[j]) / 100.0
+                lon = -int(ints[j + 1]) / 100.0
+                fallback_coords.append((lon, lat))
+            except:
+                continue
+        if fallback_coords:
+            coords.extend(fallback_coords)
 
     return coords, skipped
 
@@ -180,7 +192,7 @@ if "coords" in st.session_state:
             use_container_width=True
         )
 
-    # --- Map + Population Estimate (anchored layout) ---
+    # --- Map + Population Estimate ---
     st.markdown("<h4 style='text-align: center;'>Polygon Preview</h4>", unsafe_allow_html=True)
     lon_center = sum([pt[0] for pt in coords]) / len(coords)
     lat_center = sum([pt[1] for pt in coords]) / len(coords)
@@ -191,7 +203,6 @@ if "coords" in st.session_state:
     with map_anchor.container():
         st_folium(m, width=700, height=400)
 
-        # Population
         raster_path = "data/landscan-global-2023.tif"
         population = estimate_population_from_coords(coords, raster_path)
         if population is not None:
@@ -200,9 +211,11 @@ if "coords" in st.session_state:
 
     # --- Skipped Points ---
     if skipped:
-        st.warning(f"Skipped {len(skipped)} unrecognized coordinate group(s):")
-        for point in skipped:
-            st.text(f"• {point}")
+        filtered_skipped = [s for s in skipped if not re.match(r'LAT|LON|HEADER|ID', s, re.IGNORECASE)]
+        if filtered_skipped:
+            st.warning(f"Skipped {len(filtered_skipped)} unrecognized coordinate group(s):")
+            for point in filtered_skipped:
+                st.text(f"• {point}")
 
 # --- Attribution ---
 st.markdown("---")
