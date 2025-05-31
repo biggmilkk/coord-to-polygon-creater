@@ -83,9 +83,9 @@ def estimate_population_from_coords(coords, raster_path):
     try:
         poly_geojson = {
             "type": "FeatureCollection",
-            "features": [{
+            "features": [ {
                 "type": "Feature",
-                "geometry": {"type": "Polygon", "coordinates": [coords]},
+                "geometry": { "type": "Polygon", "coordinates": [coords] },
                 "properties": {}
             }]
         }
@@ -97,15 +97,10 @@ def estimate_population_from_coords(coords, raster_path):
 
         stats = zonal_stats(tmp_path, raster_path, stats=["sum"])
         os.unlink(tmp_path)
-
-        if stats and stats[0]["sum"] is not None:
-            return stats[0]["sum"]
-        else:
-            raise ValueError("No population data found in the polygon area.")
-
+        return stats[0]["sum"]
     except Exception as e:
-        st.error(f"❌ Error estimating population: {e}")
-        raise
+        st.error(f"Error estimating population: {e}")
+        return None
 
 # --- Generate Button ---
 generate_clicked = st.button("Generate Map", use_container_width=True)
@@ -165,6 +160,13 @@ if "coords" in st.session_state:
             use_container_width=True
         )
 
+    # --- Population Estimate FIRST ---
+    raster_path = "data/landscan-global-2023.tif"
+    population = estimate_population_from_coords(coords, raster_path)
+    if population is not None:
+        st.success(f"Estimated Population: {population:,.0f}")
+        st.caption("LandScan represents ambient population (24-hour average).")
+
     # --- Map Preview ---
     st.markdown("<h4 style='text-align: center;'>Polygon Preview</h4>", unsafe_allow_html=True)
     lon_center = sum([pt[0] for pt in coords]) / len(coords)
@@ -173,25 +175,6 @@ if "coords" in st.session_state:
     folium.Polygon(locations=[(lat, lon) for lon, lat in coords], color="blue", fill=True).add_to(m)
 
     st_folium(m, width=700, height=400)
-
-    # --- Debug: Check raster file ---
-    raster_path = "data/landscan-global-2023.tif"
-    st.write("✅ Raster file found:", os.path.exists(raster_path))
-
-    # --- Reserve layout space for population ---
-    population_placeholder = st.empty()
-
-    # --- MOCK for testing layout (uncomment this line to test display only) ---
-    # population = 12345
-
-    # --- Estimate actual population ---
-    population = estimate_population_from_coords(coords, raster_path)
-    st.write("Estimated population value:", population)
-
-    if population is not None:
-        with population_placeholder:
-            st.success(f"Estimated Population: {population:,.0f}")
-            st.caption("LandScan represents ambient population (24-hour average).")
 
 # --- Attribution ---
 st.markdown("---")
