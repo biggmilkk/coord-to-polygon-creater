@@ -8,9 +8,8 @@ from streamlit_folium import st_folium
 import tempfile
 import os
 import json
-import time  # <-- Added for delay
 
-# Version: v2318.24.4.2025
+#Version: v2318.24.4.2025
 
 st.set_page_config(page_title="KML Polygon Generator", layout="centered")
 
@@ -171,10 +170,9 @@ if "coords" in st.session_state:
     m = folium.Map(location=[lat_center, lon_center], zoom_start=9, tiles="CartoDB positron")
     folium.Polygon(locations=[(lat, lon) for lon, lat in coords], color="blue", fill=True).add_to(m)
 
-    st_folium(m, width=700, height=400)
-
-    # Delay before population estimate to allow map to render
-    time.sleep(0.5)
+    with st.container():
+        st_folium(m, width=700, height=400)
+        st.markdown("<div style='margin-top: -10px'></div>", unsafe_allow_html=True)
 
     raster_path = "data/landscan-global-2023.tif"
     population = estimate_population_from_coords(coords, raster_path)
