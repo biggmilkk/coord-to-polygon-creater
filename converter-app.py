@@ -163,12 +163,15 @@ if "coords" in st.session_state:
             use_container_width=True
         )
 
-    # --- Population Estimate ---
+    # --- Population Estimate (ABOVE the map) ---
     raster_path = "data/landscan-global-2023.tif"
     population = estimate_population_from_coords(coords, raster_path)
     if population is not None:
         st.success(f"Estimated Population: {population:,.0f}")
-        st.caption("LandScan represents ambient population (24-hour average).")
+        st.markdown(
+            "<p style='text-align: center; font-size: 0.85rem; color: grey;'>LandScan represents ambient population (24-hour average).</p>",
+            unsafe_allow_html=True
+        )
         st.markdown(
             "<p style='font-size: 0.8rem; text-align: center; color: grey;'>Population data © Oak Ridge National Laboratory. "
             "Distributed under <a href='https://creativecommons.org/licenses/by/4.0/' target='_blank'>CC BY 4.0</a>.</p>",
