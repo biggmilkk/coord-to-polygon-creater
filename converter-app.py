@@ -85,10 +85,7 @@ def estimate_population_from_coords(coords, raster_path):
             "type": "FeatureCollection",
             "features": [{
                 "type": "Feature",
-                "geometry": {
-                    "type": "Polygon",
-                    "coordinates": [coords]
-                },
+                "geometry": {"type": "Polygon", "coordinates": [coords]},
                 "properties": {}
             }]
         }
@@ -100,10 +97,15 @@ def estimate_population_from_coords(coords, raster_path):
 
         stats = zonal_stats(tmp_path, raster_path, stats=["sum"])
         os.unlink(tmp_path)
-        return stats[0]["sum"]
+
+        if stats and stats[0]["sum"] is not None:
+            return stats[0]["sum"]
+        else:
+            raise ValueError("No population data found in the polygon area.")
+
     except Exception as e:
-        st.error(f"Error estimating population: {e}")
-        return None
+        st.error(f"❌ Error estimating population: {e}")
+        raise
 
 # --- Generate Button ---
 generate_clicked = st.button("Generate Map", use_container_width=True)
@@ -163,7 +165,7 @@ if "coords" in st.session_state:
             use_container_width=True
         )
 
-    # --- Map ---
+    # --- Map Preview ---
     st.markdown("<h4 style='text-align: center;'>Polygon Preview</h4>", unsafe_allow_html=True)
     lon_center = sum([pt[0] for pt in coords]) / len(coords)
     lat_center = sum([pt[1] for pt in coords]) / len(coords)
@@ -172,12 +174,20 @@ if "coords" in st.session_state:
 
     st_folium(m, width=700, height=400)
 
-    # --- Clean fix for layout gap using placeholder ---
+    # --- Debug: Check raster file ---
+    raster_path = "data/landscan-global-2023.tif"
+    st.write("✅ Raster file found:", os.path.exists(raster_path))
+
+    # --- Reserve layout space for population ---
     population_placeholder = st.empty()
 
-    # Estimate and display population in the placeholder
-    raster_path = "data/landscan-global-2023.tif"
+    # --- MOCK for testing layout (uncomment this line to test display only) ---
+    # population = 12345
+
+    # --- Estimate actual population ---
     population = estimate_population_from_coords(coords, raster_path)
+    st.write("Estimated population value:", population)
+
     if population is not None:
         with population_placeholder:
             st.success(f"Estimated Population: {population:,.0f}")
