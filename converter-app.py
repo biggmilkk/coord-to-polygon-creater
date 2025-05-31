@@ -83,9 +83,12 @@ def estimate_population_from_coords(coords, raster_path):
     try:
         poly_geojson = {
             "type": "FeatureCollection",
-            "features": [ {
+            "features": [{
                 "type": "Feature",
-                "geometry": { "type": "Polygon", "coordinates": [coords] },
+                "geometry": {
+                    "type": "Polygon",
+                    "coordinates": [coords]
+                },
                 "properties": {}
             }]
         }
@@ -160,12 +163,17 @@ if "coords" in st.session_state:
             use_container_width=True
         )
 
-    # --- Population Estimate FIRST ---
+    # --- Population Estimate ---
     raster_path = "data/landscan-global-2023.tif"
     population = estimate_population_from_coords(coords, raster_path)
     if population is not None:
         st.success(f"Estimated Population: {population:,.0f}")
         st.caption("LandScan represents ambient population (24-hour average).")
+        st.markdown(
+            "<p style='font-size: 0.8rem; text-align: center; color: grey;'>Population data © Oak Ridge National Laboratory. "
+            "Distributed under <a href='https://creativecommons.org/licenses/by/4.0/' target='_blank'>CC BY 4.0</a>.</p>",
+            unsafe_allow_html=True
+        )
 
     # --- Map Preview ---
     st.markdown("<h4 style='text-align: center;'>Polygon Preview</h4>", unsafe_allow_html=True)
@@ -175,11 +183,3 @@ if "coords" in st.session_state:
     folium.Polygon(locations=[(lat, lon) for lon, lat in coords], color="blue", fill=True).add_to(m)
 
     st_folium(m, width=700, height=400)
-
-# --- Attribution ---
-st.markdown("---")
-st.markdown(
-    "<p style='font-size: 0.8rem; text-align: center; color: grey;'>Population data © Oak Ridge National Laboratory. "
-    "Distributed under <a href='https://creativecommons.org/licenses/by/4.0/' target='_blank'>CC BY 4.0</a>.</p>",
-    unsafe_allow_html=True
-)
