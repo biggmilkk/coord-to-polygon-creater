@@ -13,6 +13,18 @@ import json
 
 st.set_page_config(page_title="KML Polygon Generator", layout="centered")
 
+# --- CSS Fix for Map Space ---
+st.markdown("""
+    <style>
+        iframe {
+            height: 400px !important;
+            max-height: 400px !important;
+            margin-bottom: 0 !important;
+            padding-bottom: 0 !important;
+        }
+    </style>
+""", unsafe_allow_html=True)
+
 # --- Title ---
 st.markdown("<h2 style='text-align: center;'>Coordinates → KML Polygon Generator</h2>", unsafe_allow_html=True)
 st.markdown(
@@ -163,7 +175,7 @@ if "coords" in st.session_state:
             use_container_width=True
         )
 
-    # --- Population Estimate (ABOVE the map) ---
+    # --- Population Estimate ---
     raster_path = "data/landscan-global-2023.tif"
     population = estimate_population_from_coords(coords, raster_path)
     if population is not None:
@@ -185,4 +197,4 @@ if "coords" in st.session_state:
     m = folium.Map(location=[lat_center, lon_center], zoom_start=9, tiles="CartoDB positron")
     folium.Polygon(locations=[(lat, lon) for lon, lat in coords], color="blue", fill=True).add_to(m)
 
-    st_folium(m, width=700, height=400)
+    returned_map = st_folium(m, width=700, height=400)
