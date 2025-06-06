@@ -179,7 +179,7 @@ if st.session_state.get("generate_trigger"):
                     k.from_string(doc)
                     def flatten_kml_features(container):
                         placemarks = []
-                        for feature in container.features():
+                        for feature in container.features:
                             if hasattr(feature, "geometry") and feature.geometry:
                                 placemarks.append(feature)
                             elif hasattr(feature, "features"):
