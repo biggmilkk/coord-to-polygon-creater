@@ -112,10 +112,13 @@ def parse_coords(text):
         try:
             lat = float(tokens[i])
             lon = float(tokens[i + 1])
-            if abs(lat) > 90:
+
+            # Heuristic: shorthand format like 3361 10227 → 33.61 -102.27
+            if lat > 90 and lon > 180:
                 lat = lat / 100.0
-            if abs(lon) > 180:
-                lon = -abs(lon / 100.0)
+                lon = lon / 100.0
+                lon = -abs(lon)
+
             coords.append((lon, lat))
         except ValueError:
             pass
