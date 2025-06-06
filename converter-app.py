@@ -8,6 +8,7 @@ from streamlit_folium import st_folium
 import tempfile
 import os
 import json
+from shapely.geometry import Polygon
 
 # Version: v2318.24.4.2025
 
@@ -81,6 +82,18 @@ def parse_coords(text):
         i += 2
 
     return coords
+
+# --- Canada Check ---
+def is_polygon_in_canada(coords):
+    try:
+        poly = Polygon(coords)
+        centroid = poly.centroid
+        return (
+            41.0 <= centroid.y <= 83.0 and
+            -141.0 <= centroid.x <= -52.0
+        )
+    except:
+        return False
 
 # --- Population Estimation ---
 def estimate_population_from_coords(coords, raster_path):
@@ -170,27 +183,27 @@ if "coords" in st.session_state:
         )
 
     # --- Population Estimate ---
-    raster_path = "data/landscan-global-2023.tif"
+    if is_polygon_in_canada(coords):
+        raster_path = "data/canada-population-2023.tif"
+        pop_label = "Estimated Population (Canada):"
+    else:
+        raster_path = "data/landscan-global-2023.tif"
+        pop_label = "Estimated Population (Global):"
+
     population = estimate_population_from_coords(coords, raster_path)
     if population is not None:
-        st.success(f"Estimated Population: {population:,.0f}")
+        st.success(f"{pop_label} {population:,.0f}")
         st.markdown(
-            "<p style='text-align: center; font-size: 0.85rem; color: grey;'>LandScan represents ambient population (24-hour average).</p>",
-            unsafe_allow_html=True
-        )
-        st.markdown(
-            "<p style='font-size: 0.8rem; text-align: center; color: grey;'>Population data © Oak Ridge National Laboratory. "
-            "Distributed under <a href='https://creativecommons.org/licenses/by/4.0/' target='_blank'>CC BY 4.0</a>.</p>",
+            "<p style='text-align: center; font-size: 0.85rem; color: grey;'>Population data is an ambient (24-hour average) estimate.</p>",
             unsafe_allow_html=True
         )
 
     # --- Map Preview ---
     st.markdown("<h4 style='text-align: center;'>Polygon Preview</h4>", unsafe_allow_html=True)
-    lon_center = sum([pt[0] for pt in coords]) / len(coords)
-    lat_center = sum([pt[1] for pt in coords]) / len(coords)
-    m = folium.Map(location=[lat_center, lon_center], zoom_start=9, tiles="CartoDB positron")
-    folium.Polygon(locations=[(lat, lon) for lon, lat in coords], color="blue", fill=True).add_to(m)
-
+    bounds = [(lat, lon) for lon, lat in coords]
+    m = folium.Map(tiles="CartoDB positron")
+    folium.Polygon(locations=bounds, color="blue", fill=True).add_to(m)
+    m.fit_bounds(bounds)
     returned_map = st_folium(m, width=700, height=400)
 
     # --- Rerun Once to Fix Blank Space Bug ---
