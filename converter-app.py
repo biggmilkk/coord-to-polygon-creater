@@ -195,6 +195,17 @@ if st.session_state.get("generate_trigger"):
                                 for placemark in feature.features:
                                     try:
                                         geom = placemark.geometry
+                                        if geom.geom_type.lower() == "polygon":
+                                            coords = list(geom.exterior.coords)
+                                            if coords[0] != coords[-1]:
+                                                coords.append(coords[0])
+                                            all_polygons.append(coords)
+                                        else:
+                                            st.warning(f"Skipped geometry type: {geom.geom_type}")
+                                    except Exception as inner_e:
+                                        st.error(f"Error reading placemark: {inner_e}")
+                                    try:
+                                        geom = placemark.geometry
                 
                 
                                     except Exception as inner_e:
