@@ -8,19 +8,19 @@ from streamlit_folium import st_folium
 import tempfile
 import os
 import json
+from fastkml import kml as fastkml
 
 # Version: v2318.24.4.2025
 
 st.set_page_config(page_title="KML Polygon Generator", layout="centered")
 
-# --- Session state setup for delayed rerun ---
 if "rerun_done" not in st.session_state:
     st.session_state["rerun_done"] = False
 
 # --- Title ---
 st.markdown("<h2 style='text-align: center;'>Coordinates → KML Polygon Generator</h2>", unsafe_allow_html=True)
 st.markdown(
-    "<p style='text-align: center; font-size: 0.9rem; color: grey;'>Paste coordinates below to generate a polygon, preview it on a map, download KML & GeoJSON, and estimate population using LandScan data.</p>",
+    "<p style='text-align: center; font-size: 0.9rem; color: grey;'>Paste coordinates or upload a polygon file to generate a map, download KML/GeoJSON, and estimate population using LandScan data.</p>",
     unsafe_allow_html=True
 )
 
@@ -31,6 +31,40 @@ raw_input = st.text_area(
     height=150,
     key="coord_input"
 )
+
+st.markdown("### Or Upload a KML/GeoJSON File")
+
+uploaded_file = st.file_uploader("Upload Polygon File (KML or GeoJSON)", type=["kml", "geojson"])
+uploaded_coords = None
+
+if uploaded_file:
+    file_type = uploaded_file.name.split('.')[-1].lower()
+
+    try:
+        if file_type == "geojson":
+            geojson = json.load(uploaded_file)
+            feature = geojson["features"][0] if geojson["type"] == "FeatureCollection" else geojson
+            geometry = feature["geometry"]
+            if geometry["type"].lower() == "polygon":
+                uploaded_coords = geometry["coordinates"][0]
+
+        elif file_type == "kml":
+            doc = uploaded_file.read().decode("utf-8")
+            k = fastkml.KML()
+            k.from_string(doc)
+            features = list(k.features())
+            placemarks = list(features[0].features())
+            geom = placemarks[0].geometry
+            uploaded_coords = list(geom.exterior.coords)
+
+        if uploaded_coords:
+            if uploaded_coords[0] != uploaded_coords[-1]:
+                uploaded_coords.append(uploaded_coords[0])
+            st.session_state["coords"] = uploaded_coords
+            st.success("Polygon successfully loaded from uploaded file.")
+
+    except Exception as e:
+        st.error(f"Failed to parse file: {e}")
 
 # --- Coordinate Parsers ---
 def dms_to_dd(deg, min_, sec, direction):
@@ -112,20 +146,19 @@ def estimate_population_from_coords(coords, raster_path):
 # --- Generate Button ---
 generate_clicked = st.button("Generate Map", use_container_width=True)
 
-# --- Parse and Store Coordinates ---
 if generate_clicked:
     if raw_input.strip():
         parsed_coords = parse_coords(raw_input)
         if len(parsed_coords) < 3:
             st.error(f"Only detected {len(parsed_coords)} valid points — need at least 3 to form a polygon.")
-            st.session_state.pop("coords", None)  # Clear previous results
+            st.session_state.pop("coords", None)
         else:
             if parsed_coords[0] != parsed_coords[-1]:
                 parsed_coords.append(parsed_coords[0])
             st.session_state["coords"] = parsed_coords
-    else:
-        st.warning("Please enter some coordinates.")
-        st.session_state.pop("coords", None)  # Clear previous results
+    elif not uploaded_file:
+        st.warning("Please enter coordinates or upload a polygon file.")
+        st.session_state.pop("coords", None)
 
 # --- Main Output ---
 if "coords" in st.session_state:
@@ -193,7 +226,6 @@ if "coords" in st.session_state:
 
     returned_map = st_folium(m, width=700, height=400)
 
-    # --- Rerun Once to Fix Blank Space Bug ---
     if not st.session_state["rerun_done"]:
         st.session_state["rerun_done"] = True
         st.experimental_rerun()
