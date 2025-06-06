@@ -57,7 +57,7 @@ if input_mode == "Paste Coordinates":
 # --- File Upload UI ---
 uploaded_files = []
 if input_mode == "Upload a Map File":
-    uploaded_files = st.file_uploader("Upload Polygon File(s) (KML, KMZ, GeoJSON, or JSON)", type=["kml", "geojson", "kmz", "json"], accept_multiple_files=True)
+    uploaded_files = st.file_uploader("Upload Polygon File(s) (KML, KMZ, GeoJSON, or JSON)", type=["kml", "geojson", "json"], accept_multiple_files=True)
 
 # --- Clear state if map file removed after previous upload ---
 if (
@@ -184,36 +184,7 @@ if st.session_state.get("generate_trigger"):
                             if coords[0] != coords[-1]:
                                 coords.append(coords[0])
                             all_polygons.append(coords)
-                elif file_type == "kmz":
-                    with zipfile.ZipFile(BytesIO(uploaded_file.read())) as z:
-                        kml_files = [f for f in z.namelist() if f.endswith(".kml")]
-                        for kml_name in kml_files:
-                            kml_data = z.read(kml_name).decode("utf-8")
-                            k = fastkml.KML()
-                            k.from_string(kml_data)
-                            for feature in k.features:
-                                for placemark in feature.features:
-                                    try:
-                                        geom = placemark.geometry
-                                        def extract_polygons(geom):
-                                            polys = []
-                                            if geom.geom_type.lower() == "polygon":
-                                                coords = list(geom.exterior.coords)
-                                                if coords[0] != coords[-1]:
-                                                    coords.append(coords[0])
-                                                polys.append(coords)
-                                            elif geom.geom_type.lower() == "multigeometry":
-                                                for sub_geom in geom.geoms:
-                                                    polys.extend(extract_polygons(sub_geom))
-                                            return polys
-
-                                        polys = extract_polygons(geom)
-                                        if polys:
-                                            all_polygons.extend(polys)
-                                        else:
-                                            st.warning(f"Skipped geometry type: {geom.geom_type}")
-                                    except Exception as inner_e:
-                                        st.error(f"Error reading placemark: {inner_e}")
+                
             except Exception as e:
                 st.error(f"Failed to parse {uploaded_file.name}: {e}")
 
