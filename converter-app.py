@@ -12,6 +12,8 @@ from xml.etree import ElementTree as ET
 import zipfile
 from io import BytesIO
 
+#v1226.6.6.2025
+
 st.set_page_config(page_title="Polygon Generator and Population Estimate", layout="centered")
 
 # --- Session defaults ---
@@ -27,7 +29,7 @@ for key, default in {
 # --- Title ---
 st.markdown("<h2 style='text-align: center;'>Polygon Generator and Population Estimate</h2>", unsafe_allow_html=True)
 st.markdown(
-    "<p style='text-align: center; font-size: 0.9rem; color: grey;'>Upload KML/KMZ/GeoJSON files or paste coordinates to generate polygons on a map, download them, and estimate population using LandScan data.</p>",
+    "<p style='text-align: center; font-size: 0.9rem; color: grey;'>Upload KML, KMZ, GeoJSON, or JSON files, or paste raw coordinates to create geographic polygons. Visualize shapes on an interactive map, export results, and estimate population using LandScan data.</p>",
     unsafe_allow_html=True
 )
 
