@@ -17,7 +17,7 @@ st.set_page_config(page_title="KML Polygon Generator", layout="centered")
 # --- Session defaults ---
 for key, default in {
     "rerun_done": False,
-    "coords": None,
+    "coords": [],
     "generate_trigger": False,
     "file_was_uploaded": False,
 }.items():
@@ -32,7 +32,7 @@ st.markdown(
 )
 
 # --- Input Switch ---
-input_mode = st.radio("Choose Input Method", ["Paste Coordinates", "Upload a Map File"], horizontal=True)
+input_mode = st.radio("Choose Input Method", ["Paste Coordinates", "Upload Map Files"], horizontal=True)
 
 # --- Paste Coordinates ---
 if input_mode == "Paste Coordinates":
@@ -43,13 +43,13 @@ if input_mode == "Paste Coordinates":
         key="coord_input"
     )
 
-# --- File Upload ---
-uploaded_file = None
-if input_mode == "Upload a Map File":
-    uploaded_file = st.file_uploader("Upload Polygon File (KML, KMZ, GeoJSON, JSON)", type=["kml", "kmz", "geojson", "json"])
+# --- File Upload (Multiple) ---
+uploaded_files = []
+if input_mode == "Upload Map Files":
+    uploaded_files = st.file_uploader("Upload Polygon Files (KML, KMZ, GeoJSON, JSON)", type=["kml", "kmz", "geojson", "json"], accept_multiple_files=True)
 
 # --- Clean session ---
-if input_mode == "Upload a Map File" and uploaded_file is None and st.session_state["file_was_uploaded"]:
+if input_mode == "Upload Map Files" and not uploaded_files and st.session_state["file_was_uploaded"]:
     for key in ["coords", "file_was_uploaded", "rerun_done"]:
         st.session_state.pop(key, None)
     st.rerun()
@@ -131,32 +131,36 @@ if st.session_state.get("generate_trigger"):
     if input_mode == "Paste Coordinates":
         text = st.session_state.get("coord_input", "")
         all_polygons = parse_coords(text)
-    elif input_mode == "Upload a Map File" and uploaded_file:
-        file_type = uploaded_file.name.split('.')[-1].lower()
-        if file_type in ["geojson", "json"]:
-            geojson = json.load(uploaded_file)
-            features = geojson["features"] if geojson["type"] == "FeatureCollection" else [geojson]
-            for feature in features:
-                geom = feature["geometry"]
-                if geom["type"].lower() == "polygon":
-                    coords = geom["coordinates"][0]
-                    if coords[0] != coords[-1]:
-                        coords.append(coords[0])
-                    all_polygons.append(coords)
-                elif geom["type"].lower() == "multipolygon":
-                    for part in geom["coordinates"]:
-                        coords = part[0]
-                        if coords[0] != coords[-1]:
-                            coords.append(coords[0])
-                        all_polygons.append(coords)
-        elif file_type == "kml":
-            doc = uploaded_file.read().decode("utf-8")
-            all_polygons = extract_coords_from_kml_string(doc)
-        elif file_type == "kmz":
-            all_polygons = extract_coords_from_kmz(uploaded_file.read())
+    elif input_mode == "Upload Map Files" and uploaded_files:
+        for uploaded_file in uploaded_files:
+            file_type = uploaded_file.name.split('.')[-1].lower()
+            try:
+                if file_type in ["geojson", "json"]:
+                    geojson = json.load(uploaded_file)
+                    features = geojson["features"] if geojson["type"] == "FeatureCollection" else [geojson]
+                    for feature in features:
+                        geom = feature["geometry"]
+                        if geom["type"].lower() == "polygon":
+                            coords = geom["coordinates"][0]
+                            if coords[0] != coords[-1]:
+                                coords.append(coords[0])
+                            all_polygons.append(coords)
+                        elif geom["type"].lower() == "multipolygon":
+                            for part in geom["coordinates"]:
+                                coords = part[0]
+                                if coords[0] != coords[-1]:
+                                    coords.append(coords[0])
+                                all_polygons.append(coords)
+                elif file_type == "kml":
+                    doc = uploaded_file.read().decode("utf-8")
+                    all_polygons.extend(extract_coords_from_kml_string(doc))
+                elif file_type == "kmz":
+                    all_polygons.extend(extract_coords_from_kmz(uploaded_file.read()))
+            except Exception as e:
+                st.error(f"Error processing {uploaded_file.name}: {e}")
 
     if all_polygons:
-        st.session_state["coords"] = all_polygons
+        st.session_state["coords"].extend(all_polygons)
         st.session_state["file_was_uploaded"] = True
     else:
         st.warning("No valid polygons found.")
