@@ -9,6 +9,8 @@ import tempfile
 import os
 import json
 from xml.etree import ElementTree as ET
+import zipfile
+from io import BytesIO
 
 st.set_page_config(page_title="KML Polygon Generator", layout="centered")
 
@@ -44,7 +46,10 @@ if input_mode == "Paste Coordinates":
 # --- File Upload UI ---
 uploaded_file = None
 if input_mode == "Upload a Map File":
-    uploaded_file = st.file_uploader("Upload Polygon File (KML or GeoJSON)", type=["kml", "geojson"])
+    uploaded_file = st.file_uploader(
+        "Upload Polygon File (KML, KMZ, or GeoJSON/JSON)",
+        type=["kml", "kmz", "geojson", "json"]
+    )
 
 # --- Clear data if switching modes or removing input ---
 if input_mode == "Upload a Map File" and uploaded_file is None and st.session_state["file_was_uploaded"]:
@@ -103,7 +108,7 @@ def ddm_to_dd(deg, min_, direction):
     dd = float(deg) + float(min_) / 60
     return -dd if direction.upper() in ["S", "W"] else dd
 
-# --- KML Parsing via XML ---
+# --- KML & KMZ Utilities ---
 def extract_coords_from_kml_string(kml_string):
     ns = {'kml': 'http://www.opengis.net/kml/2.2'}
     root = ET.fromstring(kml_string)
@@ -117,12 +122,20 @@ def extract_coords_from_kml_string(kml_string):
                 coordinates.append((lon, lat))
     return coordinates
 
+def extract_coords_from_kmz(file_bytes):
+    with zipfile.ZipFile(BytesIO(file_bytes)) as kmz:
+        for name in kmz.namelist():
+            if name.endswith(".kml"):
+                kml_string = kmz.read(name).decode("utf-8")
+                return extract_coords_from_kml_string(kml_string)
+    return []
+
 # --- Population Estimation ---
 def estimate_population_from_coords(coords, raster_path):
     try:
         poly_geojson = {
             "type": "FeatureCollection",
-            "features": [ {
+            "features": [{
                 "type": "Feature",
                 "geometry": {"type": "Polygon", "coordinates": [coords]},
                 "properties": {}
@@ -165,15 +178,19 @@ if st.session_state.get("generate_trigger"):
         file_type = uploaded_file.name.split('.')[-1].lower()
         uploaded_coords = None
         try:
-            if file_type == "geojson":
+            if file_type in ["geojson", "json"]:
                 geojson = json.load(uploaded_file)
                 feature = geojson["features"][0] if geojson["type"] == "FeatureCollection" else geojson
                 geometry = feature["geometry"]
                 if geometry["type"].lower() == "polygon":
                     uploaded_coords = geometry["coordinates"][0]
+
             elif file_type == "kml":
                 doc = uploaded_file.read().decode("utf-8")
                 uploaded_coords = extract_coords_from_kml_string(doc)
+
+            elif file_type == "kmz":
+                uploaded_coords = extract_coords_from_kmz(uploaded_file.read())
 
             if uploaded_coords:
                 if uploaded_coords[0] != uploaded_coords[-1]:
@@ -198,7 +215,7 @@ if st.session_state.get("coords"):
     kml.newpolygon(name="My Polygon", outerboundaryis=coords)
     geojson_data = {
         "type": "FeatureCollection",
-        "features": [ {
+        "features": [{
             "type": "Feature",
             "geometry": {"type": "Polygon", "coordinates": [coords]},
             "properties": {}
