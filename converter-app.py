@@ -191,8 +191,8 @@ if st.session_state.get("generate_trigger"):
                             kml_data = z.read(kml_name).decode("utf-8")
                             k = fastkml.KML()
                             k.from_string(kml_data)
-                            for feature in k.features():
-                                for placemark in feature.features():
+                            for feature in k.features:
+                                for placemark in feature.features:
                                     geom = placemark.geometry
                                     coords = list(geom.exterior.coords)
                                     if coords[0] != coords[-1]:
