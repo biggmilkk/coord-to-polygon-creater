@@ -177,8 +177,17 @@ if st.session_state.get("generate_trigger"):
                     doc = uploaded_file.read().decode("utf-8")
                     k = fastkml.KML()
                     k.from_string(doc)
-                    for feature in k.features:
-                        for placemark in feature.features:
+                    def flatten_kml_features(container):
+    placemarks = []
+    for feature in container.features():
+        if hasattr(feature, "geometry") and feature.geometry:
+            placemarks.append(feature)
+        elif hasattr(feature, "features"):
+            placemarks.extend(flatten_kml_features(feature))
+    return placemarks
+
+                    placemarks = flatten_kml_features(k)
+                    for placemark in placemarks:
                             geom = placemark.geometry
                             coords = list(geom.exterior.coords)
                             if coords[0] != coords[-1]:
