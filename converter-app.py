@@ -25,7 +25,7 @@ st.markdown(
 )
 
 # --- Input ---
-raw_input = st.text_area(
+st.text_area(
     "Coordinates:",
     placeholder="Example: 34.2482, -98.6066\n34° 14' 53.52'' N 98° 36' 23.76'' W",
     height=150,
@@ -113,7 +113,7 @@ def parse_coords(text):
             lat = float(tokens[i])
             lon = float(tokens[i + 1])
 
-            # Heuristic: shorthand format like 3361 10227 → 33.61 -102.27
+            # Handle shorthand like 3361 10227 → 33.61, -102.27
             if lat > 90 and lon > 180:
                 lat = lat / 100.0
                 lon = lon / 100.0
@@ -157,8 +157,9 @@ def estimate_population_from_coords(coords, raster_path):
 generate_clicked = st.button("Generate Map", use_container_width=True)
 
 if generate_clicked:
-    if raw_input.strip():
-        parsed_coords = parse_coords(raw_input)
+    coord_input_text = st.session_state.get("coord_input", "")
+    if coord_input_text.strip():
+        parsed_coords = parse_coords(coord_input_text)
         if len(parsed_coords) < 3:
             st.error(f"Only detected {len(parsed_coords)} valid points — need at least 3 to form a polygon.")
             st.session_state.pop("coords", None)
@@ -234,8 +235,9 @@ if "coords" in st.session_state:
     folium.Polygon(locations=latlons, color="blue", fill=True).add_to(m)
     m.fit_bounds(latlons)
 
-    returned_map = st_folium(m, width=700, height=400)
+    st_folium(m, width=700, height=400)
 
+    # --- Rerun Once to Fix Blank Space Bug ---
     if not st.session_state["rerun_done"]:
         st.session_state["rerun_done"] = True
         st.rerun()
