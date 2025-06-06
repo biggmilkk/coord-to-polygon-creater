@@ -209,7 +209,7 @@ if st.session_state.get("generate_trigger"):
                         st.error(f"Failed to read KMZ file: {kmz_error}")
                 
                 # End of KMZ block
-                st.error(f"Failed to parse {uploaded_file.name}: {e}")
+                
 
         if all_polygons:
             st.session_state["coords"] = all_polygons
