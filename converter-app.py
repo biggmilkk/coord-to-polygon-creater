@@ -48,13 +48,12 @@ uploaded_files = []
 if input_mode == "Upload Map Files":
     uploaded_files = st.file_uploader("Upload Polygon Files (KML, KMZ, GeoJSON, JSON)", type=["kml", "kmz", "geojson", "json"], accept_multiple_files=True)
 
-# --- Clean session ---
-if input_mode == "Upload Map Files" and not uploaded_files and st.session_state["file_was_uploaded"]:
-    for key in ["coords", "file_was_uploaded", "rerun_done"]:
-        st.session_state.pop(key, None)
-    st.rerun()
+# --- Clear coords if no files uploaded ---
+if input_mode == "Upload Map Files" and not uploaded_files:
+    st.session_state["coords"] = []
+    st.session_state["file_was_uploaded"] = False
 elif input_mode == "Paste Coordinates" and not st.session_state.get("coord_input", "").strip():
-    st.session_state.pop("coords", None)
+    st.session_state["coords"] = []
 
 # --- Parsers ---
 def parse_coords(text):
@@ -160,9 +159,10 @@ if st.session_state.get("generate_trigger"):
                 st.error(f"Error processing {uploaded_file.name}: {e}")
 
     if all_polygons:
-        st.session_state["coords"].extend(all_polygons)
+        st.session_state["coords"] = all_polygons
         st.session_state["file_was_uploaded"] = True
     else:
+        st.session_state["coords"] = []
         st.warning("No valid polygons found.")
     st.session_state["generate_trigger"] = False
 
