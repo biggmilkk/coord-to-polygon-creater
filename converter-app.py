@@ -178,13 +178,13 @@ if st.session_state.get("generate_trigger"):
                     k = fastkml.KML()
                     k.from_string(doc)
                     def flatten_kml_features(container):
-    placemarks = []
-    for feature in container.features():
-        if hasattr(feature, "geometry") and feature.geometry:
-            placemarks.append(feature)
-        elif hasattr(feature, "features"):
-            placemarks.extend(flatten_kml_features(feature))
-    return placemarks
+                        placemarks = []
+                        for feature in container.features():
+                            if hasattr(feature, "geometry") and feature.geometry:
+                                placemarks.append(feature)
+                            elif hasattr(feature, "features"):
+                                placemarks.extend(flatten_kml_features(feature))
+                        return placemarks
 
                     placemarks = flatten_kml_features(k)
                     for placemark in placemarks:
