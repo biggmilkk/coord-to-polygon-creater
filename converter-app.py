@@ -32,9 +32,16 @@ raw_input = st.text_area(
     key="coord_input"
 )
 
+# --- File Upload ---
 st.markdown("### Or Upload a KML/GeoJSON File")
-
 uploaded_file = st.file_uploader("Upload Polygon File (KML or GeoJSON)", type=["kml", "geojson"])
+
+# --- Clear everything if file is removed ---
+if uploaded_file is None and "coords" in st.session_state:
+    for key in ["coords", "rerun_done"]:
+        st.session_state.pop(key, None)
+    st.experimental_rerun()
+
 uploaded_coords = None
 
 if uploaded_file:
