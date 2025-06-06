@@ -161,10 +161,15 @@ if st.session_state.get("generate_trigger"):
                 doc = uploaded_file.read().decode("utf-8")
                 k = fastkml.KML()
                 k.from_string(doc)
-                features = list(k.features())
-                placemarks = list(features[0].features)  # <-- Fixed line
-                geom = placemarks[0].geometry
-                uploaded_coords = list(geom.exterior.coords)
+                for document in k.features():
+                    for feature in document.features():
+                        if hasattr(feature, 'geometry') and feature.geometry:
+                            geom = feature.geometry
+                            if hasattr(geom, "exterior") and geom.exterior:
+                                uploaded_coords = list(geom.exterior.coords)
+                                break
+                    if uploaded_coords:
+                        break
 
             if uploaded_coords:
                 if uploaded_coords[0] != uploaded_coords[-1]:
@@ -176,7 +181,6 @@ if st.session_state.get("generate_trigger"):
         except Exception as e:
             st.error(f"Failed to parse file: {e}")
 
-    # Done triggering
     st.session_state["generate_trigger"] = False
 
 # --- Output ---
