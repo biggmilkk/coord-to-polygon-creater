@@ -9,13 +9,15 @@ import tempfile
 import os
 import json
 from fastkml import kml as fastkml
+import zipfile
+from io import BytesIO
 
 st.set_page_config(page_title="Polygon Generator & Population Estimator", layout="centered")
 
 # --- Session defaults ---
 for key, default in {
     "rerun_done": False,
-    "coords": None,
+    "coords": [],
     "generate_trigger": False,
     "file_was_uploaded": False,
     "previous_input_mode": None
@@ -26,7 +28,7 @@ for key, default in {
 # --- Title ---
 st.markdown("<h2 style='text-align: center;'>Polygon Generator & Population Estimator</h2>", unsafe_allow_html=True)
 st.markdown(
-    "<p style='text-align: center; font-size: 0.9rem; color: grey;'>Paste coordinates or upload a polygon file to generate a map, download KML/GeoJSON, and estimate population using LandScan data.</p>",
+    "<p style='text-align: center; font-size: 0.9rem; color: grey;'>Paste coordinates or upload one or more polygon files to generate a map, download KML/GeoJSON, and estimate population using LandScan data.</p>",
     unsafe_allow_html=True
 )
 
@@ -53,14 +55,14 @@ if input_mode == "Paste Coordinates":
     )
 
 # --- File Upload UI ---
-uploaded_file = None
+uploaded_files = []
 if input_mode == "Upload a Map File":
-    uploaded_file = st.file_uploader("Upload Polygon File (KML or GeoJSON)", type=["kml", "geojson"])
+    uploaded_files = st.file_uploader("Upload Polygon File(s) (KML, KMZ, GeoJSON, or JSON)", type=["kml", "geojson", "kmz", "json"], accept_multiple_files=True)
 
 # --- Clear state if map file removed after previous upload ---
 if (
     input_mode == "Upload a Map File" and
-    uploaded_file is None and
+    not uploaded_files and
     st.session_state.get("file_was_uploaded", False)
 ):
     for key in ["coords", "file_was_uploaded", "rerun_done"]:
@@ -121,11 +123,10 @@ def estimate_population_from_coords(coords, raster_path):
     try:
         poly_geojson = {
             "type": "FeatureCollection",
-            "features": [{
-                "type": "Feature",
-                "geometry": {"type": "Polygon", "coordinates": [coords]},
-                "properties": {}
-            }]
+            "features": [
+                {"type": "Feature", "geometry": {"type": "Polygon", "coordinates": [poly]}, "properties": {}}
+                for poly in coords
+            ]
         }
         with tempfile.NamedTemporaryFile(delete=False, suffix=".geojson", mode="w") as tmp:
             gdf = gpd.GeoDataFrame.from_features(poly_geojson["features"])
@@ -133,7 +134,7 @@ def estimate_population_from_coords(coords, raster_path):
             tmp_path = tmp.name
         stats = zonal_stats(tmp_path, raster_path, stats=["sum"])
         os.unlink(tmp_path)
-        return stats[0]["sum"]
+        return sum(s["sum"] or 0 for s in stats)
     except Exception as e:
         st.error(f"Error estimating population: {e}")
         return None
@@ -151,73 +152,95 @@ if st.session_state.get("generate_trigger"):
             parsed_coords = parse_coords(text)
             if len(parsed_coords) < 3:
                 st.error("At least 3 coordinate pairs are required to form a polygon.")
-                st.session_state.pop("coords", None)
             else:
                 if parsed_coords[0] != parsed_coords[-1]:
                     parsed_coords.append(parsed_coords[0])
-                st.session_state["coords"] = parsed_coords
+                st.session_state["coords"] = [parsed_coords]
                 st.session_state["file_was_uploaded"] = False
 
-    elif input_mode == "Upload a Map File" and uploaded_file:
-        file_type = uploaded_file.name.split('.')[-1].lower()
-        uploaded_coords = None
-        try:
-            if file_type == "geojson":
-                geojson = json.load(uploaded_file)
-                feature = geojson["features"][0] if geojson["type"] == "FeatureCollection" else geojson
-                geometry = feature["geometry"]
-                if geometry["type"].lower() == "polygon":
-                    uploaded_coords = geometry["coordinates"][0]
-            elif file_type == "kml":
-                doc = uploaded_file.read().decode("utf-8")
-                k = fastkml.KML()
-                k.from_string(doc)
-                features = list(k.features())
-                placemarks = list(features[0].features())
-                geom = placemarks[0].geometry
-                uploaded_coords = list(geom.exterior.coords)
+    elif input_mode == "Upload a Map File" and uploaded_files:
+        all_polygons = []
+        for uploaded_file in uploaded_files:
+            file_type = uploaded_file.name.split('.')[-1].lower()
+            try:
+                if file_type in ["geojson", "json"]:
+                    geojson = json.load(uploaded_file)
+                    features = geojson["features"] if geojson.get("type") == "FeatureCollection" else [geojson]
+                    for feature in features:
+                        geom = feature["geometry"]
+                        if geom["type"].lower() == "polygon":
+                            coords = geom["coordinates"][0]
+                            if coords[0] != coords[-1]:
+                                coords.append(coords[0])
+                            all_polygons.append(coords)
+                elif file_type == "kml":
+                    doc = uploaded_file.read().decode("utf-8")
+                    k = fastkml.KML()
+                    k.from_string(doc)
+                    for feature in k.features():
+                        for placemark in feature.features():
+                            geom = placemark.geometry
+                            coords = list(geom.exterior.coords)
+                            if coords[0] != coords[-1]:
+                                coords.append(coords[0])
+                            all_polygons.append(coords)
+                elif file_type == "kmz":
+                    with zipfile.ZipFile(BytesIO(uploaded_file.read())) as z:
+                        kml_files = [f for f in z.namelist() if f.endswith(".kml")]
+                        for kml_name in kml_files:
+                            kml_data = z.read(kml_name).decode("utf-8")
+                            k = fastkml.KML()
+                            k.from_string(kml_data)
+                            for feature in k.features():
+                                for placemark in feature.features():
+                                    geom = placemark.geometry
+                                    coords = list(geom.exterior.coords)
+                                    if coords[0] != coords[-1]:
+                                        coords.append(coords[0])
+                                    all_polygons.append(coords)
+            except Exception as e:
+                st.error(f"Failed to parse {uploaded_file.name}: {e}")
 
-            if uploaded_coords:
-                if uploaded_coords[0] != uploaded_coords[-1]:
-                    uploaded_coords.append(uploaded_coords[0])
-                st.session_state["coords"] = uploaded_coords
-                st.session_state["file_was_uploaded"] = True
-                st.success("Polygon loaded from uploaded file.")
-
-        except Exception as e:
-            st.error(f"Failed to parse file: {e}")
+        if all_polygons:
+            st.session_state["coords"] = all_polygons
+            st.session_state["file_was_uploaded"] = True
+            st.success(f"Loaded {len(all_polygons)} polygon(s) from uploaded file(s).")
 
     st.session_state["generate_trigger"] = False
 
 # --- Main Output ---
 if st.session_state.get("coords"):
-    coords = st.session_state["coords"]
+    all_coords = st.session_state["coords"]
 
     # Downloads
     kml = simplekml.Kml()
-    kml.newpolygon(name="My Polygon", outerboundaryis=coords)
+    for idx, poly in enumerate(all_coords):
+        kml.newpolygon(name=f"Polygon {idx+1}", outerboundaryis=poly)
+
     geojson_data = {
         "type": "FeatureCollection",
-        "features": [{
-            "type": "Feature",
-            "geometry": {"type": "Polygon", "coordinates": [coords]},
-            "properties": {}
-        }]
+        "features": [
+            {
+                "type": "Feature",
+                "geometry": {"type": "Polygon", "coordinates": [poly]},
+                "properties": {"id": idx+1}
+            } for idx, poly in enumerate(all_coords)
+        ]
     }
 
     col1, col2 = st.columns(2)
     with col1:
         st.download_button("Download KML", kml.kml().encode("utf-8"),
-                           file_name="polygon.kml", mime="application/vnd.google-earth.kml+xml",
+                           file_name="polygons.kml", mime="application/vnd.google-earth.kml+xml",
                            use_container_width=True)
     with col2:
         st.download_button("Download GeoJSON", json.dumps(geojson_data, indent=2).encode("utf-8"),
-                           file_name="polygon.geojson", mime="application/geo+json",
+                           file_name="polygons.geojson", mime="application/geo+json",
                            use_container_width=True)
 
     # Population
     raster_path = "data/landscan-global-2023.tif"
-    population = estimate_population_from_coords(coords, raster_path)
+    population = estimate_population_from_coords(all_coords, raster_path)
     if population is not None:
         st.success(f"Estimated Population: {population:,.0f}")
         st.markdown(
@@ -228,9 +251,13 @@ if st.session_state.get("coords"):
     # Map
     st.markdown("<h4 style='text-align: center;'>Polygon Preview</h4>", unsafe_allow_html=True)
     m = folium.Map(tiles="CartoDB positron")
-    latlons = [(lat, lon) for lon, lat in coords]
-    folium.Polygon(locations=latlons, color="blue", fill=True).add_to(m)
-    m.fit_bounds(latlons)
+    all_latlons = []
+    for poly in all_coords:
+        latlons = [(lat, lon) for lon, lat in poly]
+        folium.Polygon(locations=latlons, color="blue", fill=True).add_to(m)
+        all_latlons.extend(latlons)
+    if all_latlons:
+        m.fit_bounds(all_latlons)
     st_folium(m, width=700, height=400)
 
     # Fix blank map issue on first render
