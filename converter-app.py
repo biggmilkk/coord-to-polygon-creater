@@ -186,10 +186,10 @@ if "coords" in st.session_state:
 
     # --- Map Preview ---
     st.markdown("<h4 style='text-align: center;'>Polygon Preview</h4>", unsafe_allow_html=True)
-    lon_center = sum([pt[0] for pt in coords]) / len(coords)
-    lat_center = sum([pt[1] for pt in coords]) / len(coords)
-    m = folium.Map(location=[lat_center, lon_center], zoom_start=9, tiles="CartoDB positron")
-    folium.Polygon(locations=[(lat, lon) for lon, lat in coords], color="blue", fill=True).add_to(m)
+    m = folium.Map(tiles="CartoDB positron")
+    latlons = [(lat, lon) for lon, lat in coords]
+    folium.Polygon(locations=latlons, color="blue", fill=True).add_to(m)
+    m.fit_bounds(latlons)
 
     returned_map = st_folium(m, width=700, height=400)
 
