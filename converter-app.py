@@ -204,8 +204,8 @@ if st.session_state.get("generate_trigger"):
                                             st.warning(f"Skipped geometry type: {geom.geom_type}")
                                     except Exception as inner_e:
                                         st.error(f"Error reading placemark: {inner_e}")
-                
-                # End of KMZ block
+            except Exception as e:
+                st.error(f"Failed to parse {uploaded_file.name}: {e}")
 
         if all_polygons:
             st.session_state["coords"] = all_polygons
