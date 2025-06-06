@@ -206,7 +206,6 @@ if st.session_state.get("generate_trigger"):
                                         st.error(f"Error reading placemark: {inner_e}")
                 
                 # End of KMZ block
-                
 
         if all_polygons:
             st.session_state["coords"] = all_polygons
