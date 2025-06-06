@@ -118,12 +118,14 @@ if generate_clicked:
         parsed_coords = parse_coords(raw_input)
         if len(parsed_coords) < 3:
             st.error(f"Only detected {len(parsed_coords)} valid points — need at least 3 to form a polygon.")
+            st.session_state.pop("coords", None)  # Clear previous results
         else:
             if parsed_coords[0] != parsed_coords[-1]:
                 parsed_coords.append(parsed_coords[0])
             st.session_state["coords"] = parsed_coords
     else:
         st.warning("Please enter some coordinates.")
+        st.session_state.pop("coords", None)  # Clear previous results
 
 # --- Main Output ---
 if "coords" in st.session_state:
