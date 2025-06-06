@@ -24,10 +24,10 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-# --- Input ---
+# --- Coordinate Input ---
 st.text_area(
     "Coordinates:",
-    placeholder="Example: 34.2482, -98.6066\n34° 14' 53.52'' N 98° 36' 23.76'' W",
+    placeholder="Example: 34.2482, -98.6066\nLAT...LON 3361 10227 3383 10224",
     height=150,
     key="coord_input"
 )
@@ -38,7 +38,7 @@ uploaded_file = st.file_uploader("Upload Polygon File (KML or GeoJSON)", type=["
 
 # --- Clear everything if file is removed ---
 if uploaded_file is None and "coords" in st.session_state:
-    for key in ["coords", "rerun_done"]:
+    for key in ["coords", "rerun_done", "generate_trigger"]:
         st.session_state.pop(key, None)
     st.rerun()
 
@@ -154,9 +154,11 @@ def estimate_population_from_coords(coords, raster_path):
         return None
 
 # --- Generate Button ---
-generate_clicked = st.button("Generate Map", use_container_width=True)
+if st.button("Generate Map", use_container_width=True):
+    st.session_state["generate_trigger"] = True
 
-if generate_clicked:
+# --- Process Input on Trigger ---
+if st.session_state.get("generate_trigger"):
     coord_input_text = st.session_state.get("coord_input", "")
     if coord_input_text.strip():
         parsed_coords = parse_coords(coord_input_text)
@@ -170,6 +172,9 @@ if generate_clicked:
     elif not uploaded_file:
         st.warning("Please enter coordinates or upload a polygon file.")
         st.session_state.pop("coords", None)
+
+    # Clear the trigger so it only runs once
+    st.session_state["generate_trigger"] = False
 
 # --- Main Output ---
 if "coords" in st.session_state:
@@ -234,7 +239,6 @@ if "coords" in st.session_state:
     latlons = [(lat, lon) for lon, lat in coords]
     folium.Polygon(locations=latlons, color="blue", fill=True).add_to(m)
     m.fit_bounds(latlons)
-
     st_folium(m, width=700, height=400)
 
     # --- Rerun Once to Fix Blank Space Bug ---
