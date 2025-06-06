@@ -177,8 +177,8 @@ if st.session_state.get("generate_trigger"):
                     doc = uploaded_file.read().decode("utf-8")
                     k = fastkml.KML()
                     k.from_string(doc)
-                    for feature in k.features():
-                        for placemark in feature.features():
+                    for feature in k.features:
+                        for placemark in feature.features:
                             geom = placemark.geometry
                             coords = list(geom.exterior.coords)
                             if coords[0] != coords[-1]:
