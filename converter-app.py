@@ -161,8 +161,8 @@ if st.session_state.get("generate_trigger"):
                 doc = uploaded_file.read().decode("utf-8")
                 k = fastkml.KML()
                 k.from_string(doc)
-                for document in k.features():
-                    for feature in document.features():
+                for document in k.features:  # ✅ Correct: no parentheses
+                    for feature in document.features:  # ✅ Correct
                         if hasattr(feature, 'geometry') and feature.geometry:
                             geom = feature.geometry
                             if hasattr(geom, "exterior") and geom.exterior:
