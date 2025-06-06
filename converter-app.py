@@ -195,11 +195,21 @@ if st.session_state.get("generate_trigger"):
                                 for placemark in feature.features:
                                     try:
                                         geom = placemark.geometry
-                                        if geom.geom_type.lower() == "polygon":
-                                            coords = list(geom.exterior.coords)
-                                            if coords[0] != coords[-1]:
-                                                coords.append(coords[0])
-                                            all_polygons.append(coords)
+                                        def extract_polygons(geom):
+                                            polys = []
+                                            if geom.geom_type.lower() == "polygon":
+                                                coords = list(geom.exterior.coords)
+                                                if coords[0] != coords[-1]:
+                                                    coords.append(coords[0])
+                                                polys.append(coords)
+                                            elif geom.geom_type.lower() == "multigeometry":
+                                                for sub_geom in geom.geoms:
+                                                    polys.extend(extract_polygons(sub_geom))
+                                            return polys
+
+                                        polys = extract_polygons(geom)
+                                        if polys:
+                                            all_polygons.extend(polys)
                                         else:
                                             st.warning(f"Skipped geometry type: {geom.geom_type}")
                                     except Exception as inner_e:
