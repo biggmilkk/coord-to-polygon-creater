@@ -10,12 +10,15 @@ import os
 import json
 from fastkml import kml as fastkml
 
-# Version: v2318.24.4.2025
-
 st.set_page_config(page_title="KML Polygon Generator", layout="centered")
 
-if "rerun_done" not in st.session_state:
-    st.session_state["rerun_done"] = False
+# --- Session defaults ---
+for key, default in {
+    "rerun_done": False,
+    "file_was_uploaded": False,
+}.items():
+    if key not in st.session_state:
+        st.session_state[key] = default
 
 # --- Title ---
 st.markdown("<h2 style='text-align: center;'>Coordinates → KML Polygon Generator</h2>", unsafe_allow_html=True)
@@ -36,17 +39,20 @@ st.text_area(
 st.markdown("### Or Upload a KML/GeoJSON File")
 uploaded_file = st.file_uploader("Upload Polygon File (KML or GeoJSON)", type=["kml", "geojson"])
 
-# --- Clear everything if file is removed ---
-if uploaded_file is None and "coords" in st.session_state:
-    for key in ["coords", "rerun_done", "generate_trigger"]:
+# --- Only clear state if a file was uploaded before and is now removed ---
+if (
+    uploaded_file is None and
+    st.session_state.get("file_was_uploaded", False) and
+    "coords" in st.session_state
+):
+    for key in ["coords", "rerun_done", "generate_trigger", "file_was_uploaded"]:
         st.session_state.pop(key, None)
     st.rerun()
 
+# --- Handle File Upload ---
 uploaded_coords = None
-
 if uploaded_file:
     file_type = uploaded_file.name.split('.')[-1].lower()
-
     try:
         if file_type == "geojson":
             geojson = json.load(uploaded_file)
@@ -54,7 +60,6 @@ if uploaded_file:
             geometry = feature["geometry"]
             if geometry["type"].lower() == "polygon":
                 uploaded_coords = geometry["coordinates"][0]
-
         elif file_type == "kml":
             doc = uploaded_file.read().decode("utf-8")
             k = fastkml.KML()
@@ -68,6 +73,7 @@ if uploaded_file:
             if uploaded_coords[0] != uploaded_coords[-1]:
                 uploaded_coords.append(uploaded_coords[0])
             st.session_state["coords"] = uploaded_coords
+            st.session_state["file_was_uploaded"] = True
             st.success("Polygon successfully loaded from uploaded file.")
 
     except Exception as e:
@@ -112,13 +118,10 @@ def parse_coords(text):
         try:
             lat = float(tokens[i])
             lon = float(tokens[i + 1])
-
-            # Handle shorthand like 3361 10227 → 33.61, -102.27
             if lat > 90 and lon > 180:
                 lat = lat / 100.0
                 lon = lon / 100.0
                 lon = -abs(lon)
-
             coords.append((lon, lat))
         except ValueError:
             pass
@@ -133,19 +136,14 @@ def estimate_population_from_coords(coords, raster_path):
             "type": "FeatureCollection",
             "features": [{
                 "type": "Feature",
-                "geometry": {
-                    "type": "Polygon",
-                    "coordinates": [coords]
-                },
+                "geometry": {"type": "Polygon", "coordinates": [coords]},
                 "properties": {}
             }]
         }
-
         with tempfile.NamedTemporaryFile(delete=False, suffix=".geojson", mode="w") as tmp:
             gdf = gpd.GeoDataFrame.from_features(poly_geojson["features"])
             gdf.to_file(tmp.name, driver="GeoJSON")
             tmp_path = tmp.name
-
         stats = zonal_stats(tmp_path, raster_path, stats=["sum"])
         os.unlink(tmp_path)
         return stats[0]["sum"]
@@ -153,15 +151,15 @@ def estimate_population_from_coords(coords, raster_path):
         st.error(f"Error estimating population: {e}")
         return None
 
-# --- Generate Button ---
+# --- Generate Button Trigger ---
 if st.button("Generate Map", use_container_width=True):
     st.session_state["generate_trigger"] = True
 
-# --- Process Input on Trigger ---
+# --- Parse Text Input if Triggered ---
 if st.session_state.get("generate_trigger"):
-    coord_input_text = st.session_state.get("coord_input", "")
-    if coord_input_text.strip():
-        parsed_coords = parse_coords(coord_input_text)
+    input_text = st.session_state.get("coord_input", "")
+    if input_text.strip():
+        parsed_coords = parse_coords(input_text)
         if len(parsed_coords) < 3:
             st.error(f"Only detected {len(parsed_coords)} valid points — need at least 3 to form a polygon.")
             st.session_state.pop("coords", None)
@@ -172,53 +170,38 @@ if st.session_state.get("generate_trigger"):
     elif not uploaded_file:
         st.warning("Please enter coordinates or upload a polygon file.")
         st.session_state.pop("coords", None)
-
-    # Clear the trigger so it only runs once
     st.session_state["generate_trigger"] = False
 
 # --- Main Output ---
 if "coords" in st.session_state:
     coords = st.session_state["coords"]
 
-    # KML
+    # KML + GeoJSON
     kml = simplekml.Kml()
     kml.newpolygon(name="My Polygon", outerboundaryis=coords)
-    kml_bytes = kml.kml().encode("utf-8")
-
-    # GeoJSON
     geojson_data = {
         "type": "FeatureCollection",
         "features": [{
             "type": "Feature",
-            "geometry": {
-                "type": "Polygon",
-                "coordinates": [coords]
-            },
+            "geometry": {"type": "Polygon", "coordinates": [coords]},
             "properties": {}
         }]
     }
-    geojson_bytes = json.dumps(geojson_data, indent=2).encode("utf-8")
 
-    # --- Downloads ---
+    # Download buttons
     col1, col2 = st.columns(2)
     with col1:
-        st.download_button(
-            label="Download KML",
-            data=kml_bytes,
-            file_name="polygon.kml",
-            mime="application/vnd.google-earth.kml+xml",
-            use_container_width=True
-        )
+        st.download_button("Download KML", kml.kml().encode("utf-8"),
+                           file_name="polygon.kml",
+                           mime="application/vnd.google-earth.kml+xml",
+                           use_container_width=True)
     with col2:
-        st.download_button(
-            label="Download GeoJSON",
-            data=geojson_bytes,
-            file_name="polygon.geojson",
-            mime="application/geo+json",
-            use_container_width=True
-        )
+        st.download_button("Download GeoJSON", json.dumps(geojson_data, indent=2).encode("utf-8"),
+                           file_name="polygon.geojson",
+                           mime="application/geo+json",
+                           use_container_width=True)
 
-    # --- Population Estimate ---
+    # Population
     raster_path = "data/landscan-global-2023.tif"
     population = estimate_population_from_coords(coords, raster_path)
     if population is not None:
@@ -227,13 +210,8 @@ if "coords" in st.session_state:
             "<p style='text-align: center; font-size: 0.85rem; color: grey;'>LandScan represents ambient population (24-hour average).</p>",
             unsafe_allow_html=True
         )
-        st.markdown(
-            "<p style='font-size: 0.8rem; text-align: center; color: grey;'>Population data © Oak Ridge National Laboratory. "
-            "Distributed under <a href='https://creativecommons.org/licenses/by/4.0/' target='_blank'>CC BY 4.0</a>.</p>",
-            unsafe_allow_html=True
-        )
 
-    # --- Map Preview ---
+    # Map
     st.markdown("<h4 style='text-align: center;'>Polygon Preview</h4>", unsafe_allow_html=True)
     m = folium.Map(tiles="CartoDB positron")
     latlons = [(lat, lon) for lon, lat in coords]
@@ -241,7 +219,7 @@ if "coords" in st.session_state:
     m.fit_bounds(latlons)
     st_folium(m, width=700, height=400)
 
-    # --- Rerun Once to Fix Blank Space Bug ---
+    # One-time rerun to fix render bug
     if not st.session_state["rerun_done"]:
         st.session_state["rerun_done"] = True
         st.rerun()
