@@ -10,7 +10,7 @@ import os
 import json
 from fastkml import kml as fastkml
 
-st.set_page_config(page_title="KML Polygon Generator", layout="centered")
+st.set_page_config(page_title="Polygon Generator & Population Estimator", layout="centered")
 
 # --- Session defaults ---
 for key, default in {
@@ -24,7 +24,7 @@ for key, default in {
         st.session_state[key] = default
 
 # --- Title ---
-st.markdown("<h2 style='text-align: center;'>Coordinates → KML Polygon Generator</h2>", unsafe_allow_html=True)
+st.markdown("<h2 style='text-align: center;'>Polygon Generator & Population Estimator</h2>", unsafe_allow_html=True)
 st.markdown(
     "<p style='text-align: center; font-size: 0.9rem; color: grey;'>Paste coordinates or upload a polygon file to generate a map, download KML/GeoJSON, and estimate population using LandScan data.</p>",
     unsafe_allow_html=True
