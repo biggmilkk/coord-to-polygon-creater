@@ -1,10 +1,6 @@
 streamlit
 simplekml
 folium
-streamlit-folium
 geopandas
 rasterstats
-fastkml
-fiona
-shapely>=2.0
-pyproj
+streamlit-folium
