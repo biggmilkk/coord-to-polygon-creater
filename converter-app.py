@@ -162,7 +162,7 @@ if st.session_state.get("generate_trigger"):
                 k = fastkml.KML()
                 k.from_string(doc)
                 features = list(k.features())
-                placemarks = list(features[0].features())
+                placemarks = list(features[0].features)  # <-- Fixed line
                 geom = placemarks[0].geometry
                 uploaded_coords = list(geom.exterior.coords)
 
