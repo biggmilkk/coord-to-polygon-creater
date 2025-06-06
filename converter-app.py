@@ -161,12 +161,13 @@ if st.session_state.get("generate_trigger"):
                 doc = uploaded_file.read().decode("utf-8")
                 k = fastkml.KML()
                 k.from_string(doc)
-                for document in k.features:  # ✅ Correct: no parentheses
-                    for feature in document.features:  # ✅ Correct
+                for document in k.features:
+                    for feature in document.features:
                         if hasattr(feature, 'geometry') and feature.geometry:
                             geom = feature.geometry
                             if hasattr(geom, "exterior") and geom.exterior:
-                                uploaded_coords = list(geom.exterior.coords)
+                                # ✅ Normalize coordinates to (float, float)
+                                uploaded_coords = [(float(x), float(y)) for x, y in geom.exterior.coords]
                                 break
                     if uploaded_coords:
                         break
@@ -177,6 +178,8 @@ if st.session_state.get("generate_trigger"):
                 st.session_state["coords"] = uploaded_coords
                 st.session_state["file_was_uploaded"] = True
                 st.success("Polygon loaded from uploaded file.")
+            else:
+                st.warning("No valid polygon geometry found in the uploaded file.")
 
         except Exception as e:
             st.error(f"Failed to parse file: {e}")
