@@ -18,6 +18,7 @@ for key, default in {
     "coords": None,
     "generate_trigger": False,
     "file_was_uploaded": False,
+    "previous_input_mode": None
 }.items():
     if key not in st.session_state:
         st.session_state[key] = default
@@ -31,6 +32,16 @@ st.markdown(
 
 # --- Input Method Switch ---
 input_mode = st.radio("Choose Input Method", ["Paste Coordinates", "Upload a Map File"], horizontal=True)
+
+# --- Detect input method change and clear outputs ---
+if (
+    st.session_state["previous_input_mode"] is not None and
+    st.session_state["previous_input_mode"] != input_mode
+):
+    for key in ["coords", "file_was_uploaded", "rerun_done"]:
+        st.session_state.pop(key, None)
+
+st.session_state["previous_input_mode"] = input_mode
 
 # --- Coordinate Input UI ---
 if input_mode == "Paste Coordinates":
@@ -46,15 +57,25 @@ uploaded_file = None
 if input_mode == "Upload a Map File":
     uploaded_file = st.file_uploader("Upload Polygon File (KML or GeoJSON)", type=["kml", "geojson"])
 
-# --- Clear data if switching modes or removing input ---
-if input_mode == "Upload a Map File" and uploaded_file is None and st.session_state["file_was_uploaded"]:
+# --- Clear state if map file removed after previous upload ---
+if (
+    input_mode == "Upload a Map File" and
+    uploaded_file is None and
+    st.session_state.get("file_was_uploaded", False)
+):
     for key in ["coords", "file_was_uploaded", "rerun_done"]:
         st.session_state.pop(key, None)
     st.rerun()
-elif input_mode == "Paste Coordinates" and not st.session_state.get("coord_input", "").strip():
-    st.session_state.pop("coords", None)
 
-# --- Coordinate Parsing ---
+# --- Coordinate Parsers ---
+def dms_to_dd(deg, min_, sec, direction):
+    dd = float(deg) + float(min_) / 60 + float(sec) / 3600
+    return -dd if direction.upper() in ["S", "W"] else dd
+
+def ddm_to_dd(deg, min_, direction):
+    dd = float(deg) + float(min_) / 60
+    return -dd if direction.upper() in ["S", "W"] else dd
+
 def parse_coords(text):
     text = text.replace(",", " ").replace("′", "'").replace("''", "\"").replace("“", "\"").replace("”", "\"")
     coords = []
@@ -95,14 +116,6 @@ def parse_coords(text):
         i += 2
     return coords
 
-def dms_to_dd(deg, min_, sec, direction):
-    dd = float(deg) + float(min_) / 60 + float(sec) / 3600
-    return -dd if direction.upper() in ["S", "W"] else dd
-
-def ddm_to_dd(deg, min_, direction):
-    dd = float(deg) + float(min_) / 60
-    return -dd if direction.upper() in ["S", "W"] else dd
-
 # --- Population Estimation ---
 def estimate_population_from_coords(coords, raster_path):
     try:
@@ -129,10 +142,9 @@ def estimate_population_from_coords(coords, raster_path):
 if st.button("Generate Map", use_container_width=True):
     st.session_state["generate_trigger"] = True
 
-# --- Main Logic for Each Mode ---
+# --- Handle Input ---
 if st.session_state.get("generate_trigger"):
 
-    # --- From Coordinates ---
     if input_mode == "Paste Coordinates":
         text = st.session_state.get("coord_input", "")
         if text.strip():
@@ -146,7 +158,6 @@ if st.session_state.get("generate_trigger"):
                 st.session_state["coords"] = parsed_coords
                 st.session_state["file_was_uploaded"] = False
 
-    # --- From Uploaded File ---
     elif input_mode == "Upload a Map File" and uploaded_file:
         file_type = uploaded_file.name.split('.')[-1].lower()
         uploaded_coords = None
@@ -176,10 +187,9 @@ if st.session_state.get("generate_trigger"):
         except Exception as e:
             st.error(f"Failed to parse file: {e}")
 
-    # Done triggering
     st.session_state["generate_trigger"] = False
 
-# --- Output ---
+# --- Main Output ---
 if st.session_state.get("coords"):
     coords = st.session_state["coords"]
 
@@ -223,6 +233,7 @@ if st.session_state.get("coords"):
     m.fit_bounds(latlons)
     st_folium(m, width=700, height=400)
 
+    # Fix blank map issue on first render
     if not st.session_state["rerun_done"]:
         st.session_state["rerun_done"] = True
         st.rerun()
