@@ -40,7 +40,7 @@ uploaded_file = st.file_uploader("Upload Polygon File (KML or GeoJSON)", type=["
 if uploaded_file is None and "coords" in st.session_state:
     for key in ["coords", "rerun_done"]:
         st.session_state.pop(key, None)
-    st.experimental_rerun()
+    st.rerun()
 
 uploaded_coords = None
 
@@ -235,4 +235,4 @@ if "coords" in st.session_state:
 
     if not st.session_state["rerun_done"]:
         st.session_state["rerun_done"] = True
-        st.experimental_rerun()
+        st.rerun()
