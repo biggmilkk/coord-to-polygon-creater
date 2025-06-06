@@ -8,7 +8,7 @@ from streamlit_folium import st_folium
 import tempfile
 import os
 import json
-from fastkml import kml as fastkml
+from xml.etree import ElementTree as ET
 
 st.set_page_config(page_title="KML Polygon Generator", layout="centered")
 
@@ -103,12 +103,26 @@ def ddm_to_dd(deg, min_, direction):
     dd = float(deg) + float(min_) / 60
     return -dd if direction.upper() in ["S", "W"] else dd
 
+# --- KML Parsing via XML ---
+def extract_coords_from_kml_string(kml_string):
+    ns = {'kml': 'http://www.opengis.net/kml/2.2'}
+    root = ET.fromstring(kml_string)
+    coordinates = []
+    for coord_text in root.findall(".//kml:Polygon/kml:outerBoundaryIs/kml:LinearRing/kml:coordinates", ns):
+        raw_coords = coord_text.text.strip().split()
+        for coord in raw_coords:
+            parts = coord.split(',')
+            if len(parts) >= 2:
+                lon, lat = map(float, parts[:2])
+                coordinates.append((lon, lat))
+    return coordinates
+
 # --- Population Estimation ---
 def estimate_population_from_coords(coords, raster_path):
     try:
         poly_geojson = {
             "type": "FeatureCollection",
-            "features": [{
+            "features": [ {
                 "type": "Feature",
                 "geometry": {"type": "Polygon", "coordinates": [coords]},
                 "properties": {}
@@ -159,18 +173,7 @@ if st.session_state.get("generate_trigger"):
                     uploaded_coords = geometry["coordinates"][0]
             elif file_type == "kml":
                 doc = uploaded_file.read().decode("utf-8")
-                k = fastkml.KML()
-                k.from_string(doc)
-                for document in k.features:
-                    for feature in document.features:
-                        if hasattr(feature, 'geometry') and feature.geometry:
-                            geom = feature.geometry
-                            if hasattr(geom, "exterior") and geom.exterior:
-                                # ✅ Normalize coordinates to (float, float)
-                                uploaded_coords = [(float(x), float(y)) for x, y in geom.exterior.coords]
-                                break
-                    if uploaded_coords:
-                        break
+                uploaded_coords = extract_coords_from_kml_string(doc)
 
             if uploaded_coords:
                 if uploaded_coords[0] != uploaded_coords[-1]:
@@ -195,7 +198,7 @@ if st.session_state.get("coords"):
     kml.newpolygon(name="My Polygon", outerboundaryis=coords)
     geojson_data = {
         "type": "FeatureCollection",
-        "features": [{
+        "features": [ {
             "type": "Feature",
             "geometry": {"type": "Polygon", "coordinates": [coords]},
             "properties": {}
