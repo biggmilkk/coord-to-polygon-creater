@@ -38,7 +38,7 @@ input_mode = st.radio("Choose Input Method", ["Paste Coordinates", "Upload Map F
 if input_mode == "Paste Coordinates":
     st.text_area(
         "Coordinates:",
-        placeholder="Example: 4019 8042 4035 8035 4035 8027 4043 8013",
+        placeholder="Example: LAT...LON 4019 8042 4035 8035 ...",
         height=150,
         key="coord_input"
     )
@@ -54,7 +54,7 @@ if input_mode == "Upload Map Files" and not uploaded_files:
 elif input_mode == "Paste Coordinates" and not st.session_state.get("coord_input", "").strip():
     st.session_state["coords"] = []
 
-# --- Final Working Parser for LAT LON DM ---
+# --- Final Working Parser for LAT LON DM + Force Negative Longitude ---
 def dm_to_dd(dm):
     dm = abs(dm)
     degrees = int(dm // 100)
@@ -62,8 +62,7 @@ def dm_to_dd(dm):
     return round(degrees + minutes / 60, 6)
 
 def parse_coords(text):
-    # Strip labels like "LAT...LON" and symbols
-    text = re.sub(r'[^\d\s-]', ' ', text.upper())
+    text = re.sub(r'[^\d\s-]', ' ', text.upper())  # remove LAT...LON, etc.
     text = re.sub(r'\s+', ' ', text).strip()
     tokens = text.split()
 
@@ -76,6 +75,11 @@ def parse_coords(text):
             if (lat_dm % 100) < 60 and (lon_dm % 100) < 60:
                 lat = dm_to_dd(lat_dm)
                 lon = dm_to_dd(lon_dm)
+
+                # Assume western hemisphere (force longitude negative)
+                if lon > 0:
+                    lon = -lon
+
                 coords.append((lon, lat))
             i += 2
         except:
@@ -203,7 +207,7 @@ if st.session_state.get("coords"):
         st.download_button("Download GeoJSON", json.dumps(geojson_data, indent=2).encode("utf-8"), file_name="polygons.geojson", mime="application/geo+json", use_container_width=True)
 
     # Population
-    raster_path = "data/landscan-global-2023.tif"  # Replace with your actual raster
+    raster_path = "data/landscan-global-2023.tif"  # Replace with your raster path
     population = estimate_population_from_coords(polygons, raster_path)
     if population is not None:
         st.success(f"Estimated Population: {population:,.0f}")
