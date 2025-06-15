@@ -109,7 +109,7 @@ def parse_coords(text):
         if coords:
             return [coords]
 
-    # Try DM (original format)
+    # Try DM
     try:
         tokens = [int(token) for token in tokens if token.lstrip('-').isdigit()]
         i = 0
@@ -118,7 +118,9 @@ def parse_coords(text):
             lon_dm = tokens[i + 1]
             if (lat_dm % 100) < 60 and (lon_dm % 100) < 60:
                 lat = dm_to_dd(lat_dm)
-                lon = -dm_to_dd(lon_dm)
+                lon = dm_to_dd(lon_dm)
+                if lon > 0:
+                    lon = -lon  # assume Western Hemisphere
                 coords.append((lon, lat))
             i += 2
         if coords and coords[0] != coords[-1]:
