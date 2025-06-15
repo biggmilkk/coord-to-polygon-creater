@@ -38,7 +38,7 @@ input_mode = st.radio("Choose Input Method", ["Paste Coordinates", "Upload Map F
 if input_mode == "Paste Coordinates":
     st.text_area(
         "Coordinates:",
-        placeholder="Example: LAT...LON 4019 8042 4035 8035 ...",
+        placeholder="Examples:\n4019 8042\n40.3167 -80.7000\n40°19′00″N 80°42′00″W",
         height=150,
         key="coord_input"
     )
@@ -60,27 +60,75 @@ def dm_to_dd(dm):
     minutes = dm % 100
     return round(degrees + minutes / 60, 6)
 
-def parse_coords(text):
-    text = re.sub(r'[^\d\s-]', ' ', text.upper())
-    text = re.sub(r'\s+', ' ', text).strip()
-    tokens = text.split()
+def dms_to_dd(degrees, minutes, seconds, direction):
+    dd = degrees + minutes / 60 + seconds / 3600
+    if direction in ['S', 'W']:
+        dd *= -1
+    return round(dd, 6)
 
+def parse_coords(text):
+    text = text.replace(',', ' ').replace(';', ' ')
+    tokens = re.findall(r'[-+]?\d*\.\d+|[-+]?\d+', text.upper())
     coords = []
-    i = 0
-    while i < len(tokens) - 1:
+
+    # Try Decimal Degrees (DD)
+    if len(tokens) >= 2:
         try:
-            lat_dm = int(tokens[i])
-            lon_dm = int(tokens[i + 1])
+            float_tokens = list(map(float, tokens))
+            if all(-180 <= x <= 180 for x in float_tokens):
+                i = 0
+                while i < len(float_tokens) - 1:
+                    lat, lon = float_tokens[i], float_tokens[i + 1]
+                    if abs(lat) <= 90 and abs(lon) <= 180:
+                        coords.append((lon, lat))
+                        i += 2
+                    else:
+                        i += 1
+                if coords and coords[0] != coords[-1]:
+                    coords.append(coords[0])
+                if coords:
+                    return [coords]
+        except:
+            pass
+
+    # Try DMS
+    dms_pattern = re.findall(r'(\d+)[°:\s](\d+)[′:\s](\d+)[″\s]?([NSEW])', text.upper())
+    if len(dms_pattern) >= 2:
+        coords = []
+        for i in range(0, len(dms_pattern) - 1, 2):
+            try:
+                lat_d, lat_m, lat_s, lat_dir = dms_pattern[i]
+                lon_d, lon_m, lon_s, lon_dir = dms_pattern[i + 1]
+                lat = dms_to_dd(int(lat_d), int(lat_m), int(lat_s), lat_dir)
+                lon = dms_to_dd(int(lon_d), int(lon_m), int(lon_s), lon_dir)
+                coords.append((lon, lat))
+            except:
+                continue
+        if coords and coords[0] != coords[-1]:
+            coords.append(coords[0])
+        if coords:
+            return [coords]
+
+    # Try DM (original format)
+    try:
+        tokens = [int(token) for token in tokens if token.lstrip('-').isdigit()]
+        i = 0
+        while i < len(tokens) - 1:
+            lat_dm = tokens[i]
+            lon_dm = tokens[i + 1]
             if (lat_dm % 100) < 60 and (lon_dm % 100) < 60:
                 lat = dm_to_dd(lat_dm)
-                lon = -dm_to_dd(lon_dm)  # Assume Western Hemisphere
-                coords.append((lon, lat))  # (lon, lat)
+                lon = -dm_to_dd(lon_dm)
+                coords.append((lon, lat))
             i += 2
-        except:
-            i += 1
-    if coords and coords[0] != coords[-1]:
-        coords.append(coords[0])
-    return [coords] if coords else []
+        if coords and coords[0] != coords[-1]:
+            coords.append(coords[0])
+        if coords:
+            return [coords]
+    except:
+        pass
+
+    return []
 
 # --- KML/KMZ Handlers ---
 def extract_coords_from_kml_string(kml_string):
@@ -214,7 +262,7 @@ if st.session_state.get("coords"):
     m = folium.Map(tiles="CartoDB positron")
     all_points = []
     for poly in polygons:
-        latlons = [(lat, lon) for lon, lat in poly]  # Flip for folium
+        latlons = [(lat, lon) for lon, lat in poly]
         folium.Polygon(locations=latlons, color="blue", fill=True).add_to(m)
         all_points.extend(latlons)
 
