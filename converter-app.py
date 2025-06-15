@@ -43,47 +43,74 @@ if input_mode == "Paste Coordinates":
         key="coord_input"
     )
 
-# --- File Upload (Multiple) ---
+# --- File Upload ---
 uploaded_files = []
 if input_mode == "Upload Map Files":
     uploaded_files = st.file_uploader("Upload Polygon Files (KML, KMZ, GeoJSON, JSON)", type=["kml", "kmz", "geojson", "json"], accept_multiple_files=True)
 
-# --- Clear coords if no files uploaded ---
 if input_mode == "Upload Map Files" and not uploaded_files:
     st.session_state["coords"] = []
     st.session_state["file_was_uploaded"] = False
 elif input_mode == "Paste Coordinates" and not st.session_state.get("coord_input", "").strip():
     st.session_state["coords"] = []
 
-# --- Auto-detect Coordinate Parser ---
+# --- Coordinate Parser with Auto-detection and Format Support ---
+def dm_to_dd(dm):
+    dm = abs(dm)
+    degrees = int(dm // 100)
+    minutes = dm % 100
+    return round(degrees + minutes / 60, 6)
+
+def dms_to_dd(deg, minutes, seconds, direction=None):
+    dd = abs(deg) + minutes / 60 + seconds / 3600
+    if direction and direction.upper() in ["S", "W"]:
+        dd = -dd
+    return round(dd, 6)
+
 def parse_coords(text):
-    tokens = re.findall(r'-?\d+\.?\d*', text.replace(',', ' '))
+    text = text.replace(",", " ").replace("\n", " ").replace("°", " ").replace("'", " ").replace("\"", " ")
+    tokens = re.findall(r'-?\d+\.?\d*|[NSEW]', text.upper())
     coords = []
     i = 0
+
     while i < len(tokens) - 1:
         try:
-            first = float(tokens[i])
-            second = float(tokens[i + 1])
+            if i + 3 < len(tokens) and tokens[i+3] in ['N', 'S']:
+                lat = dms_to_dd(float(tokens[i]), float(tokens[i+1]), float(tokens[i+2]), tokens[i+3])
+                i += 4
+                if i + 3 < len(tokens) and tokens[i+3] in ['E', 'W']:
+                    lon = dms_to_dd(float(tokens[i]), float(tokens[i+1]), float(tokens[i+2]), tokens[i+3])
+                    i += 4
+                    coords.append((lon, lat))
+                    continue
+                else:
+                    break
 
-            # Auto-detect order
-            if abs(first) <= 90 and abs(second) > 90:
-                lat, lon = first, second  # LAT LON
-            elif abs(second) <= 90 and abs(first) > 90:
-                lat, lon = second, first  # LON LAT
+            first = float(tokens[i])
+            second = float(tokens[i+1])
+
+            if all(60 <= abs(x % 100) < 100 for x in (first, second)):
+                lat = dm_to_dd(first)
+                lon = dm_to_dd(second)
+            elif abs(first) <= 90 and abs(second) <= 180:
+                lat, lon = first, second
+            elif abs(second) <= 90 and abs(first) <= 180:
+                lon, lat = first, second
             else:
                 i += 2
                 continue
 
-            coords.append((lon, lat))  # (lon, lat) for GeoJSON
-        except ValueError:
-            pass
-        i += 2
+            coords.append((lon, lat))
+            i += 2
+
+        except Exception:
+            i += 1
 
     if coords and coords[0] != coords[-1]:
         coords.append(coords[0])
     return [coords] if coords else []
 
-# --- KML/KMZ Parser ---
+# --- KML/KMZ Handlers ---
 def extract_coords_from_kml_string(kml_string):
     ns = {'kml': 'http://www.opengis.net/kml/2.2'}
     root = ET.fromstring(kml_string)
@@ -132,11 +159,10 @@ def estimate_population_from_coords(multi_coords, raster_path):
         st.error(f"Error estimating population: {e}")
         return None
 
-# --- Generate Button ---
+# --- Generate ---
 if st.button("Generate Map", use_container_width=True):
     st.session_state["generate_trigger"] = True
 
-# --- Main Processing ---
 if st.session_state.get("generate_trigger"):
     all_polygons = []
     if input_mode == "Paste Coordinates":
