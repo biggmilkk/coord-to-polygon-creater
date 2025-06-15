@@ -27,7 +27,7 @@ for key, default in {
 # --- Title ---
 st.markdown("<h2 style='text-align: center;'>Polygon Generator and Population Estimate</h2>", unsafe_allow_html=True)
 st.markdown(
-    "<p style='text-align: center; font-size: 0.9rem; color: grey;'>Paste coordinates or upload map files to generate a polygon and population estimate using LandScan data.</p>",
+    "<p style='text-align: center; font-size: 0.9rem; color: grey;'>Paste coordinates or upload map files to generate a polygon and estimate population using LandScan data.</p>",
     unsafe_allow_html=True
 )
 
@@ -54,15 +54,15 @@ if input_mode == "Upload Map Files" and not uploaded_files:
 elif input_mode == "Paste Coordinates" and not st.session_state.get("coord_input", "").strip():
     st.session_state["coords"] = []
 
-# --- Final Working Parser for LAT LON DM + Force Negative Longitude ---
+# --- Final Working Parser for LAT LON DM + Fix for Negative Longitude ---
 def dm_to_dd(dm):
     dm = abs(dm)
     degrees = int(dm // 100)
     minutes = dm % 100
-    return round(degrees + minutes / 60, 6)
+    return degrees + minutes / 60
 
 def parse_coords(text):
-    text = re.sub(r'[^\d\s-]', ' ', text.upper())  # remove LAT...LON, etc.
+    text = re.sub(r'[^\d\s-]', ' ', text.upper())
     text = re.sub(r'\s+', ' ', text).strip()
     tokens = text.split()
 
@@ -70,17 +70,19 @@ def parse_coords(text):
     i = 0
     while i < len(tokens) - 1:
         try:
+            # Read in LAT LON order
             lat_dm = int(tokens[i])
             lon_dm = int(tokens[i + 1])
+
             if (lat_dm % 100) < 60 and (lon_dm % 100) < 60:
                 lat = dm_to_dd(lat_dm)
                 lon = dm_to_dd(lon_dm)
 
-                # Assume western hemisphere (force longitude negative)
+                # Assume Western Hemisphere
                 if lon > 0:
                     lon = -lon
 
-                coords.append((lon, lat))
+                coords.append((lon, lat))  # GeoJSON = (lon, lat)
             i += 2
         except:
             i += 1
@@ -217,6 +219,7 @@ if st.session_state.get("coords"):
     m = folium.Map(tiles="CartoDB positron")
     all_points = []
     for poly in polygons:
+        # Flip to (lat, lon) for Folium
         latlons = [(lat, lon) for lon, lat in poly]
         folium.Polygon(locations=latlons, color="blue", fill=True).add_to(m)
         all_points.extend(latlons)
