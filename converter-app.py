@@ -88,15 +88,14 @@ def parse_coords(text):
 
     try:
         tokens = list(map(int, int_tokens))
-        for i in range(0, len(tokens) - 1, 2):
-            lat_dm = tokens[i]
-            lon_dm = tokens[i + 1]
-            if lat_dm % 100 < 60 and lon_dm % 100 < 60:
+        if all(t % 100 < 60 for t in tokens):
+            for i in range(0, len(tokens) - 1, 2):
+                lat_dm = tokens[i]
+                lon_dm = tokens[i + 1]
                 lat = dm_to_dd(lat_dm)
                 lon = -dm_to_dd(lon_dm)
                 coords.append((lat, lon))
-        if coords:
-            if coords[0] != coords[-1]:
+            if coords and coords[0] != coords[-1]:
                 coords.append(coords[0])
             return [coords]
     except:
