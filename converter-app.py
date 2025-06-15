@@ -14,7 +14,6 @@ from io import BytesIO
 
 st.set_page_config(page_title="Polygon Generator and Population Estimate", layout="centered")
 
-# --- Session State Defaults ---
 for key, default in {
     "coords": [],
     "generate_trigger": False,
@@ -22,62 +21,100 @@ for key, default in {
     if key not in st.session_state:
         st.session_state[key] = default
 
-# --- Title ---
 st.markdown("<h2 style='text-align: center;'>Polygon Generator and Population Estimate</h2>", unsafe_allow_html=True)
 st.markdown(
     "<p style='text-align: center; font-size: 0.9rem; color: grey;'>Upload spatial data files or enter coordinates manually to visualize geographic areas on an interactive map. Define custom polygons and generate population estimates using LandScan data.</p>",
     unsafe_allow_html=True
 )
 
-# --- Input Method ---
 input_mode = st.radio("Choose Input Method", ["Paste Coordinates", "Upload Map Files"], horizontal=True)
 
-# --- Coordinate Input ---
 if input_mode == "Paste Coordinates":
-    st.text_area(
-        "Coordinates:",
-        placeholder="Examples:\nLAT...LON 3906 7742 3906 7739 3906 7737...",
-        height=150,
-        key="coord_input"
-    )
+    st.text_area("Coordinates:", height=150, key="coord_input")
 
-# --- File Upload ---
 uploaded_files = []
 if input_mode == "Upload Map Files":
     uploaded_files = st.file_uploader("Upload Polygon Files (KML, KMZ, GeoJSON, JSON)", type=["kml", "kmz", "geojson", "json"], accept_multiple_files=True)
 
-# --- Clean up if no input ---
 if input_mode == "Upload Map Files" and not uploaded_files:
     st.session_state["coords"] = []
 elif input_mode == "Paste Coordinates" and not st.session_state.get("coord_input", "").strip():
     st.session_state["coords"] = []
 
-# --- Coordinate Parsing for NWS LAT...LON (hundredths of degrees) ---
+def dm_to_dd(dm):
+    degrees = int(dm // 100)
+    minutes = dm % 100
+    return round(degrees + minutes / 60, 6)
+
+def dms_to_dd(degrees, minutes, seconds, direction):
+    dd = degrees + minutes / 60 + seconds / 3600
+    if direction in ['S', 'W']:
+        dd *= -1
+    return round(dd, 6)
+
 def parse_coords(text):
-    text = re.sub(r'[^\d\s]', '', text)
-    tokens = re.findall(r'\d+', text)
+    text = text.replace(',', ' ').replace(';', ' ')
+    dms_pattern = re.findall(r'(\d+)[\u00b0:\s](\d+)[\u2032:\s](\d+)[\u2033\s]?([NSEW])', text.upper())
+    float_tokens = re.findall(r'[-+]?\d*\.\d+', text)
+    int_tokens = re.findall(r'\b\d+\b', text)
     coords = []
 
+    if len(dms_pattern) >= 2:
+        try:
+            for i in range(0, len(dms_pattern) - 1, 2):
+                lat_d, lat_m, lat_s, lat_dir = dms_pattern[i]
+                lon_d, lon_m, lon_s, lon_dir = dms_pattern[i + 1]
+                lat = dms_to_dd(int(lat_d), int(lat_m), int(lat_s), lat_dir)
+                lon = dms_to_dd(int(lon_d), int(lon_m), int(lon_s), lon_dir)
+                coords.append((lat, lon))
+            if coords[0] != coords[-1]:
+                coords.append(coords[0])
+            return [coords]
+        except:
+            pass
+
+    if len(float_tokens) >= 2:
+        try:
+            floats = list(map(float, float_tokens))
+            for i in range(0, len(floats) - 1, 2):
+                lat = floats[i]
+                lon = floats[i + 1]
+                coords.append((lat, lon))
+            if coords[0] != coords[-1]:
+                coords.append(coords[0])
+            return [coords]
+        except:
+            pass
+
     try:
-        tokens = [int(t) for t in tokens]
-        if len(tokens) % 2 != 0:
-            st.warning("Odd number of coordinate values. Please check your input.")
-            return []
+        tokens = list(map(int, int_tokens))
+        for i in range(0, len(tokens) - 1, 2):
+            lat_dm = tokens[i]
+            lon_dm = tokens[i + 1]
+            if lat_dm % 100 < 60 and lon_dm % 100 < 60:
+                lat = dm_to_dd(lat_dm)
+                lon = -dm_to_dd(lon_dm)
+                coords.append((lat, lon))
+        if coords:
+            if coords[0] != coords[-1]:
+                coords.append(coords[0])
+            return [coords]
+    except:
+        pass
 
-        for i in range(0, len(tokens), 2):
+    try:
+        tokens = list(map(int, int_tokens))
+        for i in range(0, len(tokens) - 1, 2):
             lat = tokens[i] / 100.0
-            lon = -tokens[i + 1] / 100.0  # NWS format assumes western hemisphere
+            lon = -tokens[i + 1] / 100.0
             coords.append((lat, lon))
-
-        if coords and coords[0] != coords[-1]:
-            coords.append(coords[0])  # close polygon
-
+        if coords[0] != coords[-1]:
+            coords.append(coords[0])
         return [coords]
     except Exception as e:
-        st.error(f"Parse error: {e}")
+        st.error(f"Auto-detect failed: {e}")
         return []
 
-# --- KML/KMZ Handlers ---
 def extract_coords_from_kml_string(kml_string):
     ns = {'kml': 'http://www.opengis.net/kml/2.2'}
     root = ET.fromstring(kml_string)
@@ -104,7 +141,6 @@ def extract_coords_from_kmz(file_bytes):
                 return extract_coords_from_kml_string(kml_string)
     return []
 
-# --- Population Estimation ---
 def estimate_population_from_coords(multi_coords, raster_path):
     try:
         features = []
@@ -126,11 +162,9 @@ def estimate_population_from_coords(multi_coords, raster_path):
         st.error(f"Error estimating population: {e}")
         return None
 
-# --- Generate Button ---
 if st.button("Generate Map", use_container_width=True):
     st.session_state["generate_trigger"] = True
 
-# --- Main Processing ---
 if st.session_state.get("generate_trigger"):
     all_polygons = []
 
@@ -176,18 +210,15 @@ if st.session_state.get("generate_trigger"):
         st.warning("No valid polygons found.")
     st.session_state["generate_trigger"] = False
 
-# --- Output ---
 if st.session_state.get("coords"):
     polygons = st.session_state["coords"]
 
     with st.spinner("Generating map and estimating population..."):
-        # --- Export KML ---
         kml = simplekml.Kml()
         for i, poly in enumerate(polygons):
             kml_coords = [(lon, lat) for lat, lon in poly]
             kml.newpolygon(name=f"Polygon {i+1}", outerboundaryis=kml_coords)
 
-        # --- Export GeoJSON ---
         geojson_data = {
             "type": "FeatureCollection",
             "features": [
@@ -201,13 +232,11 @@ if st.session_state.get("coords"):
         with col2:
             st.download_button("Download GeoJSON", json.dumps(geojson_data, indent=2).encode("utf-8"), file_name="polygons.geojson", mime="application/geo+json", use_container_width=True)
 
-        # --- Population Estimate ---
         raster_path = "data/landscan-global-2023.tif"
         population = estimate_population_from_coords(polygons, raster_path)
         if population is not None:
             st.success(f"Estimated Population: {population:,.0f}")
 
-        # --- Map Rendering ---
         st.markdown("<h4 style='text-align: center;'>Polygon Preview</h4>", unsafe_allow_html=True)
         m = folium.Map(tiles="CartoDB positron")
         all_points = []
