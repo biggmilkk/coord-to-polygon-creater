@@ -76,7 +76,7 @@ def parse_coords(text):
                 lon = dm_to_dd(lon_dm)
                 if lon > 0:
                     lon = -lon  # Assume Western Hemisphere
-                coords.append((lon, lat))  # GeoJSON/KML order
+                coords.append((lon, lat))  # Store in GeoJSON/KML order
             i += 2
         except:
             i += 1
@@ -190,7 +190,7 @@ if st.session_state.get("coords"):
     # Download Buttons
     kml = simplekml.Kml()
     for i, poly in enumerate(polygons):
-        kml.newpolygon(name=f"Polygon {i+1}", outerboundaryis=poly)
+        kml.newpolygon(name=f"Polygon {i+1}", outerboundaryis=poly)  # (lon, lat)
 
     geojson_data = {
         "type": "FeatureCollection",
