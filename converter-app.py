@@ -27,7 +27,7 @@ for key, default in {
 # --- Title ---
 st.markdown("<h2 style='text-align: center;'>Polygon Generator and Population Estimate</h2>", unsafe_allow_html=True)
 st.markdown(
-    "<p style='text-align: center; font-size: 0.9rem; color: grey;'>Paste coordinates or upload map files to generate a polygon and estimate population using LandScan data.</p>",
+    "<p style='text-align: center; font-size: 0.9rem; color: grey;'>Upload spatial data files or enter coordinates manually to visualize geographic areas on an interactive map. Define custom polygons and generate population estimates using LandScan data.</p>",
     unsafe_allow_html=True
 )
 
