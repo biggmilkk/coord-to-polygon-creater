@@ -54,7 +54,7 @@ if input_mode == "Upload Map Files" and not uploaded_files:
 elif input_mode == "Paste Coordinates" and not st.session_state.get("coord_input", "").strip():
     st.session_state["coords"] = []
 
-# --- Final DM/DD Parser ---
+# --- Final parse_coords() Fix for LAT LON DM Format ---
 def dm_to_dd(dm):
     dm = abs(dm)
     degrees = int(dm // 100)
@@ -62,36 +62,21 @@ def dm_to_dd(dm):
     return round(degrees + minutes / 60, 6)
 
 def parse_coords(text):
-    text = text.replace(",", " ").replace("\n", " ")
+    text = re.sub(r'[^\d\s-]', ' ', text.upper())  # remove LAT...LON or symbols
     tokens = re.findall(r'-?\d+', text)
     coords = []
     i = 0
-
     while i < len(tokens) - 1:
         try:
-            first = int(tokens[i])
-            second = int(tokens[i + 1])
-
-            # Detect Degrees & Minutes format: 4019 8042 = 40°19′, 80°42′
-            if 1000 <= abs(first) <= 9999 and 0 <= (abs(first) % 100) < 60 and \
-               1000 <= abs(second) <= 9999 and 0 <= (abs(second) % 100) < 60:
-                lat = dm_to_dd(first)
-                lon = dm_to_dd(second)
+            lat_raw = int(tokens[i])
+            lon_raw = int(tokens[i + 1])
+            if (lat_raw % 100) < 60 and (lon_raw % 100) < 60:
+                lat = dm_to_dd(lat_raw)
+                lon = dm_to_dd(lon_raw)
                 coords.append((lon, lat))
-                i += 2
-                continue
-
-            # Decimal degrees fallback
-            first = float(tokens[i])
-            second = float(tokens[i + 1])
-            if abs(first) <= 90 and abs(second) <= 180:
-                coords.append((second, first))
-            elif abs(second) <= 90 and abs(first) <= 180:
-                coords.append((first, second))
             i += 2
-        except Exception:
+        except:
             i += 1
-
     if coords and coords[0] != coords[-1]:
         coords.append(coords[0])
     return [coords] if coords else []
