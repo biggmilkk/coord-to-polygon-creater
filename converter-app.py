@@ -54,14 +54,14 @@ if input_mode == "Upload Map Files" and not uploaded_files:
 elif input_mode == "Paste Coordinates" and not st.session_state.get("coord_input", "").strip():
     st.session_state["coords"] = []
 
-# --- Coordinate Parsing (LAT LON DM with negative lon) ---
+# --- Coordinate Parsing ---
 def dm_to_dd(dm):
     degrees = int(dm // 100)
     minutes = dm % 100
     return round(degrees + minutes / 60, 6)
 
 def parse_coords(text):
-    text = re.sub(r'[^\d\s-]', ' ', text.upper())  # Remove non-numeric junk
+    text = re.sub(r'[^\d\s-]', ' ', text.upper())
     text = re.sub(r'\s+', ' ', text).strip()
     tokens = text.split()
 
@@ -73,14 +73,11 @@ def parse_coords(text):
             lon_dm = int(tokens[i + 1])
             if (lat_dm % 100) < 60 and (lon_dm % 100) < 60:
                 lat = dm_to_dd(lat_dm)
-                lon = dm_to_dd(lon_dm)
-                if lon > 0:
-                    lon = -lon  # Assume Western Hemisphere
-                coords.append((lon, lat))  # Store in GeoJSON/KML order
+                lon = -dm_to_dd(lon_dm)  # Assume Western Hemisphere
+                coords.append((lon, lat))  # (lon, lat)
             i += 2
         except:
             i += 1
-
     if coords and coords[0] != coords[-1]:
         coords.append(coords[0])
     return [coords] if coords else []
@@ -187,11 +184,12 @@ if st.session_state.get("generate_trigger"):
 if st.session_state.get("coords"):
     polygons = st.session_state["coords"]
 
-    # Download Buttons
+    # --- ✅ Export KML (correct lon, lat order) ---
     kml = simplekml.Kml()
     for i, poly in enumerate(polygons):
-        kml.newpolygon(name=f"Polygon {i+1}", outerboundaryis=poly)  # (lon, lat)
+        kml.newpolygon(name=f"Polygon {i+1}", outerboundaryis=poly)
 
+    # --- ✅ Export GeoJSON (correct lon, lat order) ---
     geojson_data = {
         "type": "FeatureCollection",
         "features": [
@@ -205,13 +203,13 @@ if st.session_state.get("coords"):
     with col2:
         st.download_button("Download GeoJSON", json.dumps(geojson_data, indent=2).encode("utf-8"), file_name="polygons.geojson", mime="application/geo+json", use_container_width=True)
 
-    # Population Estimate
+    # --- Population Estimate ---
     raster_path = "data/landscan-global-2023.tif"
     population = estimate_population_from_coords(polygons, raster_path)
     if population is not None:
         st.success(f"Estimated Population: {population:,.0f}")
 
-    # Map Rendering (lat, lon for Folium)
+    # --- Map Rendering (lat, lon for Folium) ---
     st.markdown("<h4 style='text-align: center;'>Polygon Preview</h4>", unsafe_allow_html=True)
     m = folium.Map(tiles="CartoDB positron")
     all_points = []
