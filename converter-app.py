@@ -236,14 +236,17 @@ if st.session_state.get("coords"):
         if population is not None:
             st.success(f"Estimated Population: {population:,.0f}")
 
-        st.markdown("<h4 style='text-align: center;'>Polygon Preview</h4>", unsafe_allow_html=True)
-        m = folium.Map(tiles="CartoDB positron")
-        all_points = []
-        for poly in polygons:
-            folium.Polygon(locations=poly, color="blue", fill=True).add_to(m)
-            all_points.extend(poly)
+        with st.container():
+            st.markdown("<h4 style='text-align: center;'>Polygon Preview</h4>", unsafe_allow_html=True)
+            m = folium.Map(tiles="CartoDB positron")
+            all_points = []
+            for poly in polygons:
+                folium.Polygon(locations=poly, color="blue", fill=True).add_to(m)
+                all_points.extend(poly)
 
-        if all_points:
-            m.fit_bounds(all_points)
+            if all_points:
+                bounds = [[min(p[0] for p in all_points), min(p[1] for p in all_points)],
+                          [max(p[0] for p in all_points), max(p[1] for p in all_points)]]
+                m.fit_bounds(bounds, padding=(5, 5))
 
-        st_folium(m, width=700, height=400, key="map_view", returned_objects=[])
+            st_folium(m, width=700, height=400, key="map_view", returned_objects=[])
