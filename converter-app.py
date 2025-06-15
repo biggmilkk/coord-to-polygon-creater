@@ -54,81 +54,35 @@ if input_mode == "Upload Map Files" and not uploaded_files:
 elif input_mode == "Paste Coordinates" and not st.session_state.get("coord_input", "").strip():
     st.session_state["coords"] = []
 
-# --- Coordinate Parsing ---
+# --- Coordinate Conversion ---
 def dm_to_dd(dm):
     degrees = int(dm // 100)
     minutes = dm % 100
     return round(degrees + minutes / 60, 6)
 
-def dms_to_dd(degrees, minutes, seconds, direction):
-    dd = degrees + minutes / 60 + seconds / 3600
-    if direction in ['S', 'W']:
-        dd *= -1
-    return round(dd, 6)
-
 def parse_coords(text):
     text = text.replace(',', ' ').replace(';', ' ')
-    tokens = re.findall(r'[-+]?\d*\.\d+|[-+]?\d+', text.upper())
+    tokens = re.findall(r'\d{4}', text)  # Match only 4-digit DM values
     coords = []
 
-    # Try Decimal Degrees (DD)
-    if len(tokens) >= 2:
-        try:
-            float_tokens = list(map(float, tokens))
-            if all(-180 <= x <= 180 for x in float_tokens):
-                i = 0
-                while i < len(float_tokens) - 1:
-                    lat, lon = float_tokens[i], float_tokens[i + 1]
-                    if abs(lat) <= 90 and abs(lon) <= 180:
-                        coords.append((lon, lat))
-                        i += 2
-                    else:
-                        i += 1
-                if coords and coords[0] != coords[-1]:
-                    coords.append(coords[0])
-                if coords:
-                    return [coords]
-        except:
-            pass
-
-    # Try DMS
-    dms_pattern = re.findall(r'(\d+)[°:\s](\d+)[′:\s](\d+)[″\s]?([NSEW])', text.upper())
-    if len(dms_pattern) >= 2:
-        coords = []
-        for i in range(0, len(dms_pattern) - 1, 2):
-            try:
-                lat_d, lat_m, lat_s, lat_dir = dms_pattern[i]
-                lon_d, lon_m, lon_s, lon_dir = dms_pattern[i + 1]
-                lat = dms_to_dd(int(lat_d), int(lat_m), int(lat_s), lat_dir)
-                lon = dms_to_dd(int(lon_d), int(lon_m), int(lon_s), lon_dir)
-                coords.append((lon, lat))
-            except:
-                continue
-        if coords and coords[0] != coords[-1]:
-            coords.append(coords[0])
-        if coords:
-            return [coords]
-
-    # Try DM (Lat Lon format, western hemisphere assumed)
     try:
-        tokens = [int(token) for token in tokens if token.lstrip('-').isdigit()]
+        tokens = [int(token) for token in tokens]
         i = 0
         while i < len(tokens) - 1:
             lat_dm = tokens[i]
             lon_dm = tokens[i + 1]
+
             if (lat_dm % 100) < 60 and (lon_dm % 100) < 60:
                 lat = dm_to_dd(lat_dm)
-                lon = -dm_to_dd(abs(lon_dm))  # assume Western Hemisphere
-                coords.append((lon, lat))
+                lon = -dm_to_dd(lon_dm)  # Assume Western Hemisphere
+                coords.append((lat, lon))
             i += 2
+
         if coords and coords[0] != coords[-1]:
             coords.append(coords[0])
-        if coords:
-            return [coords]
+        return [coords] if coords else []
     except:
-        pass
-
-    return []
+        return []
 
 # --- KML/KMZ Handlers ---
 def extract_coords_from_kml_string(kml_string):
@@ -142,7 +96,7 @@ def extract_coords_from_kml_string(kml_string):
             parts = coord.split(',')
             if len(parts) >= 2:
                 lon, lat = map(float, parts[:2])
-                coords.append((lon, lat))
+                coords.append((lat, lon))
         if coords and coords[0] != coords[-1]:
             coords.append(coords[0])
         if coords:
@@ -164,7 +118,7 @@ def estimate_population_from_coords(multi_coords, raster_path):
         for coords in multi_coords:
             features.append({
                 "type": "Feature",
-                "geometry": {"type": "Polygon", "coordinates": [coords]},
+                "geometry": {"type": "Polygon", "coordinates": [[(lon, lat) for lat, lon in coords]]},
                 "properties": {}
             })
         poly_geojson = {"type": "FeatureCollection", "features": features}
@@ -205,12 +159,14 @@ if st.session_state.get("generate_trigger"):
                                 coords = geom["coordinates"][0]
                                 if coords[0] != coords[-1]:
                                     coords.append(coords[0])
+                                coords = [(lat, lon) for lon, lat in coords]
                                 all_polygons.append(coords)
                             elif geom["type"].lower() == "multipolygon":
                                 for part in geom["coordinates"]:
                                     coords = part[0]
                                     if coords[0] != coords[-1]:
                                         coords.append(coords[0])
+                                    coords = [(lat, lon) for lon, lat in coords]
                                     all_polygons.append(coords)
                     elif file_type == "kml":
                         doc = uploaded_file.read().decode("utf-8")
@@ -235,13 +191,14 @@ if st.session_state.get("coords"):
         # --- ✅ Export KML ---
         kml = simplekml.Kml()
         for i, poly in enumerate(polygons):
-            kml.newpolygon(name=f"Polygon {i+1}", outerboundaryis=poly)
+            kml_coords = [(lon, lat) for lat, lon in poly]
+            kml.newpolygon(name=f"Polygon {i+1}", outerboundaryis=kml_coords)
 
         # --- ✅ Export GeoJSON ---
         geojson_data = {
             "type": "FeatureCollection",
             "features": [
-                {"type": "Feature", "geometry": {"type": "Polygon", "coordinates": [poly]}, "properties": {}} for poly in polygons
+                {"type": "Feature", "geometry": {"type": "Polygon", "coordinates": [[(lon, lat) for lat, lon in poly]]}, "properties": {}} for poly in polygons
             ]
         }
 
@@ -262,9 +219,8 @@ if st.session_state.get("coords"):
         m = folium.Map(tiles="CartoDB positron")
         all_points = []
         for poly in polygons:
-            latlons = [(lat, lon) for lon, lat in poly]  # Flip to (lat, lon) for folium
-            folium.Polygon(locations=latlons, color="blue", fill=True).add_to(m)
-            all_points.extend(latlons)
+            folium.Polygon(locations=poly, color="blue", fill=True).add_to(m)
+            all_points.extend(poly)
 
         if all_points:
             m.fit_bounds(all_points)
