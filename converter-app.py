@@ -71,7 +71,7 @@ def parse_coords(text):
 
         if coords and coords[0] != coords[-1]:
             coords.append(coords[0])  # close polygon
-        st.info(f"Parsed {len(coords) - 1} coordinate points.")
+
         return [coords]
     except Exception as e:
         st.error(f"Parse error: {e}")
