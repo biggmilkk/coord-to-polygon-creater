@@ -36,7 +36,7 @@ input_mode = st.radio("Choose Input Method", ["Paste Coordinates", "Upload Map F
 if input_mode == "Paste Coordinates":
     st.text_area(
         "Coordinates:",
-        placeholder="Examples:\n4019 8042\n40.3167 -80.7000\n40°19′00″N 80°42′00″W",
+        placeholder="Examples:\n4019 8042\nLAT...LON 3906 7742 3906 7739 ...",
         height=150,
         key="coord_input"
     )
@@ -52,32 +52,37 @@ if input_mode == "Upload Map Files" and not uploaded_files:
 elif input_mode == "Paste Coordinates" and not st.session_state.get("coord_input", "").strip():
     st.session_state["coords"] = []
 
-# --- Coordinate Helpers ---
+# --- Coordinate Parsing ---
 def dm_to_dd(dm):
     degrees = int(dm // 100)
     minutes = dm % 100
     return round(degrees + minutes / 60, 6)
 
 def parse_coords(text):
-    text = re.sub(r'[^\d\s]', '', text)  # Remove non-digit characters
+    text = re.sub(r'[^\d\s]', '', text)
     tokens = re.findall(r'\d+', text)
     coords = []
 
     try:
-        tokens = [int(token) for token in tokens]
-        for i in range(0, len(tokens) - 1, 2):
+        tokens = [int(t) for t in tokens]
+        if len(tokens) % 2 != 0:
+            st.warning("Odd number of coordinate values. Please check your input.")
+            return []
+
+        for i in range(0, len(tokens), 2):
             lat_dm = tokens[i]
             lon_dm = tokens[i + 1]
             if (lat_dm % 100) >= 60 or (lon_dm % 100) >= 60:
-                continue  # skip invalid coords
+                st.warning(f"Skipped invalid coordinate pair: {lat_dm}, {lon_dm}")
+                continue
             lat = dm_to_dd(lat_dm)
-            lon = -dm_to_dd(lon_dm)  # assume Western Hemisphere
+            lon = -dm_to_dd(lon_dm)
             coords.append((lat, lon))
 
-        if len(coords) >= 3 and coords[0] != coords[-1]:
-            coords.append(coords[0])
-
-        return [coords] if coords else []
+        if coords and coords[0] != coords[-1]:
+            coords.append(coords[0])  # close polygon
+        st.info(f"Parsed {len(coords)-1} coordinate points.")
+        return [coords]
     except Exception as e:
         st.error(f"Parse error: {e}")
         return []
