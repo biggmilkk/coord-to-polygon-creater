@@ -27,7 +27,7 @@ for key, default in {
 # --- Title ---
 st.markdown("<h2 style='text-align: center;'>Polygon Generator and Population Estimate</h2>", unsafe_allow_html=True)
 st.markdown(
-    "<p style='text-align: center; font-size: 0.9rem; color: grey;'>Upload spatial data files or enter coordinates manually to visualize geographic areas on an interactive map. Define custom polygons and generate population estimates using LandScan data.</p>",
+    "<p style='text-align: center; font-size: 0.9rem; color: grey;'>Paste coordinates or upload map files to generate a polygon and population estimate using LandScan data.</p>",
     unsafe_allow_html=True
 )
 
@@ -54,7 +54,7 @@ if input_mode == "Upload Map Files" and not uploaded_files:
 elif input_mode == "Paste Coordinates" and not st.session_state.get("coord_input", "").strip():
     st.session_state["coords"] = []
 
-# --- Final parse_coords() Fix for LAT LON DM Format ---
+# --- Final Working Parser for LAT LON DM ---
 def dm_to_dd(dm):
     dm = abs(dm)
     degrees = int(dm // 100)
@@ -62,21 +62,25 @@ def dm_to_dd(dm):
     return round(degrees + minutes / 60, 6)
 
 def parse_coords(text):
-    text = re.sub(r'[^\d\s-]', ' ', text.upper())  # remove LAT...LON or symbols
-    tokens = re.findall(r'-?\d+', text)
+    # Strip labels like "LAT...LON" and symbols
+    text = re.sub(r'[^\d\s-]', ' ', text.upper())
+    text = re.sub(r'\s+', ' ', text).strip()
+    tokens = text.split()
+
     coords = []
     i = 0
     while i < len(tokens) - 1:
         try:
-            lat_raw = int(tokens[i])
-            lon_raw = int(tokens[i + 1])
-            if (lat_raw % 100) < 60 and (lon_raw % 100) < 60:
-                lat = dm_to_dd(lat_raw)
-                lon = dm_to_dd(lon_raw)
+            lat_dm = int(tokens[i])
+            lon_dm = int(tokens[i + 1])
+            if (lat_dm % 100) < 60 and (lon_dm % 100) < 60:
+                lat = dm_to_dd(lat_dm)
+                lon = dm_to_dd(lon_dm)
                 coords.append((lon, lat))
             i += 2
         except:
             i += 1
+
     if coords and coords[0] != coords[-1]:
         coords.append(coords[0])
     return [coords] if coords else []
@@ -199,7 +203,7 @@ if st.session_state.get("coords"):
         st.download_button("Download GeoJSON", json.dumps(geojson_data, indent=2).encode("utf-8"), file_name="polygons.geojson", mime="application/geo+json", use_container_width=True)
 
     # Population
-    raster_path = "data/landscan-global-2023.tif"
+    raster_path = "data/landscan-global-2023.tif"  # Replace with your actual raster
     population = estimate_population_from_coords(polygons, raster_path)
     if population is not None:
         st.success(f"Estimated Population: {population:,.0f}")
