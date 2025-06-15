@@ -61,8 +61,9 @@ def dm_to_dd(dm):
     return round(degrees + minutes / 60, 6)
 
 def parse_coords(text):
-    text = text.replace(',', ' ').replace(';', ' ')
-    tokens = re.findall(r'\d{4}', text)  # Match only 4-digit DM values
+    # Remove non-digit characters except whitespace
+    text = re.sub(r'[^\d\s]', '', text)
+    tokens = re.findall(r'\d+', text)
     coords = []
 
     try:
@@ -71,17 +72,16 @@ def parse_coords(text):
         while i < len(tokens) - 1:
             lat_dm = tokens[i]
             lon_dm = tokens[i + 1]
-
             if (lat_dm % 100) < 60 and (lon_dm % 100) < 60:
                 lat = dm_to_dd(lat_dm)
                 lon = -dm_to_dd(lon_dm)  # Assume Western Hemisphere
                 coords.append((lat, lon))
             i += 2
-
         if coords and coords[0] != coords[-1]:
             coords.append(coords[0])
         return [coords] if coords else []
-    except:
+    except Exception as e:
+        st.error(f"Parse error: {e}")
         return []
 
 # --- KML/KMZ Handlers ---
