@@ -55,23 +55,35 @@ if input_mode == "Upload Map Files" and not uploaded_files:
 elif input_mode == "Paste Coordinates" and not st.session_state.get("coord_input", "").strip():
     st.session_state["coords"] = []
 
-# --- Parsers ---
+# --- Auto-detect Coordinate Parser ---
 def parse_coords(text):
     tokens = re.findall(r'-?\d+\.?\d*', text.replace(',', ' '))
     coords = []
     i = 0
     while i < len(tokens) - 1:
         try:
-            lat = float(tokens[i])
-            lon = float(tokens[i + 1])
-            coords.append((lon, lat))
+            first = float(tokens[i])
+            second = float(tokens[i + 1])
+
+            # Auto-detect order
+            if abs(first) <= 90 and abs(second) > 90:
+                lat, lon = first, second  # LAT LON
+            elif abs(second) <= 90 and abs(first) > 90:
+                lat, lon = second, first  # LON LAT
+            else:
+                i += 2
+                continue
+
+            coords.append((lon, lat))  # (lon, lat) for GeoJSON
         except ValueError:
             pass
         i += 2
+
     if coords and coords[0] != coords[-1]:
         coords.append(coords[0])
     return [coords] if coords else []
 
+# --- KML/KMZ Parser ---
 def extract_coords_from_kml_string(kml_string):
     ns = {'kml': 'http://www.opengis.net/kml/2.2'}
     root = ET.fromstring(kml_string)
