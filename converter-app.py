@@ -109,7 +109,7 @@ def parse_coords(text):
         if coords:
             return [coords]
 
-    # Try DM
+    # Try DM (Lat Lon format, western hemisphere assumed)
     try:
         tokens = [int(token) for token in tokens if token.lstrip('-').isdigit()]
         i = 0
@@ -118,9 +118,7 @@ def parse_coords(text):
             lon_dm = tokens[i + 1]
             if (lat_dm % 100) < 60 and (lon_dm % 100) < 60:
                 lat = dm_to_dd(lat_dm)
-                lon = dm_to_dd(lon_dm)
-                if lon > 0:
-                    lon = -lon  # assume Western Hemisphere
+                lon = -dm_to_dd(abs(lon_dm))  # assume Western Hemisphere
                 coords.append((lon, lat))
             i += 2
         if coords and coords[0] != coords[-1]:
@@ -264,7 +262,7 @@ if st.session_state.get("coords"):
         m = folium.Map(tiles="CartoDB positron")
         all_points = []
         for poly in polygons:
-            latlons = [(lat, lon) for lon, lat in poly]
+            latlons = [(lat, lon) for lon, lat in poly]  # Flip to (lat, lon) for folium
             folium.Polygon(locations=latlons, color="blue", fill=True).add_to(m)
             all_points.extend(latlons)
 
