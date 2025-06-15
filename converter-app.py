@@ -245,4 +245,5 @@ if st.session_state.get("coords"):
 
         if all_points:
             m.fit_bounds(all_points)
-        st_folium(m, width=700, height=400)
+
+        st_folium(m, width=700, height=400, key="map_view", returned_objects=[])
