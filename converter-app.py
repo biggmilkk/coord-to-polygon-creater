@@ -38,7 +38,7 @@ input_mode = st.radio("Choose Input Method", ["Paste Coordinates", "Upload Map F
 if input_mode == "Paste Coordinates":
     st.text_area(
         "Coordinates:",
-        placeholder="Example: 3361 10227 3383 10224 3383 10167 3342 10176",
+        placeholder="Example: 4019 8042 4035 8035 4035 8027 4043 8013",
         height=150,
         key="coord_input"
     )
@@ -54,55 +54,41 @@ if input_mode == "Upload Map Files" and not uploaded_files:
 elif input_mode == "Paste Coordinates" and not st.session_state.get("coord_input", "").strip():
     st.session_state["coords"] = []
 
-# --- Coordinate Parser with Auto-detection and Format Support ---
+# --- Final DM/DD Parser ---
 def dm_to_dd(dm):
     dm = abs(dm)
     degrees = int(dm // 100)
     minutes = dm % 100
     return round(degrees + minutes / 60, 6)
 
-def dms_to_dd(deg, minutes, seconds, direction=None):
-    dd = abs(deg) + minutes / 60 + seconds / 3600
-    if direction and direction.upper() in ["S", "W"]:
-        dd = -dd
-    return round(dd, 6)
-
 def parse_coords(text):
-    text = text.replace(",", " ").replace("\n", " ").replace("°", " ").replace("'", " ").replace("\"", " ")
-    tokens = re.findall(r'-?\d+\.?\d*|[NSEW]', text.upper())
+    text = text.replace(",", " ").replace("\n", " ")
+    tokens = re.findall(r'-?\d+', text)
     coords = []
     i = 0
 
     while i < len(tokens) - 1:
         try:
-            if i + 3 < len(tokens) and tokens[i+3] in ['N', 'S']:
-                lat = dms_to_dd(float(tokens[i]), float(tokens[i+1]), float(tokens[i+2]), tokens[i+3])
-                i += 4
-                if i + 3 < len(tokens) and tokens[i+3] in ['E', 'W']:
-                    lon = dms_to_dd(float(tokens[i]), float(tokens[i+1]), float(tokens[i+2]), tokens[i+3])
-                    i += 4
-                    coords.append((lon, lat))
-                    continue
-                else:
-                    break
+            first = int(tokens[i])
+            second = int(tokens[i + 1])
 
-            first = float(tokens[i])
-            second = float(tokens[i+1])
-
-            if all(60 <= abs(x % 100) < 100 for x in (first, second)):
+            # Detect Degrees & Minutes format: 4019 8042 = 40°19′, 80°42′
+            if 1000 <= abs(first) <= 9999 and 0 <= (abs(first) % 100) < 60 and \
+               1000 <= abs(second) <= 9999 and 0 <= (abs(second) % 100) < 60:
                 lat = dm_to_dd(first)
                 lon = dm_to_dd(second)
-            elif abs(first) <= 90 and abs(second) <= 180:
-                lat, lon = first, second
-            elif abs(second) <= 90 and abs(first) <= 180:
-                lon, lat = first, second
-            else:
+                coords.append((lon, lat))
                 i += 2
                 continue
 
-            coords.append((lon, lat))
+            # Decimal degrees fallback
+            first = float(tokens[i])
+            second = float(tokens[i + 1])
+            if abs(first) <= 90 and abs(second) <= 180:
+                coords.append((second, first))
+            elif abs(second) <= 90 and abs(first) <= 180:
+                coords.append((first, second))
             i += 2
-
         except Exception:
             i += 1
 
@@ -159,10 +145,11 @@ def estimate_population_from_coords(multi_coords, raster_path):
         st.error(f"Error estimating population: {e}")
         return None
 
-# --- Generate ---
+# --- Generate Button ---
 if st.button("Generate Map", use_container_width=True):
     st.session_state["generate_trigger"] = True
 
+# --- Main Processing ---
 if st.session_state.get("generate_trigger"):
     all_polygons = []
     if input_mode == "Paste Coordinates":
