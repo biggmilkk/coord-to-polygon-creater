@@ -16,10 +16,8 @@ st.set_page_config(page_title="Polygon Generator and Population Estimate", layou
 
 # --- Session State Defaults ---
 for key, default in {
-    "rerun_done": False,
     "coords": [],
     "generate_trigger": False,
-    "file_was_uploaded": False,
 }.items():
     if key not in st.session_state:
         st.session_state[key] = default
@@ -27,7 +25,7 @@ for key, default in {
 # --- Title ---
 st.markdown("<h2 style='text-align: center;'>Polygon Generator and Population Estimate</h2>", unsafe_allow_html=True)
 st.markdown(
-    "<p style='text-align: center; font-size: 0.9rem; color: grey;'>Upload spatial data files or enter coordinates manually to visualize geographic areas on an interactive map. Define custom polygons and generate population estimates using LandScan data.</p>",
+    "<p style='text-align: center; font-size: 0.9rem; color: grey;'>Paste coordinates or upload map files to generate a polygon and estimate population using LandScan data.</p>",
     unsafe_allow_html=True
 )
 
@@ -187,39 +185,38 @@ if st.button("Generate Map", use_container_width=True):
 if st.session_state.get("generate_trigger"):
     all_polygons = []
 
-    if input_mode == "Paste Coordinates":
-        text = st.session_state.get("coord_input", "")
-        all_polygons = parse_coords(text)
-        if all_polygons:
-            st.write("✅ Parsed coordinates (lon, lat):")
-            st.write(all_polygons[0])
-    elif input_mode == "Upload Map Files" and uploaded_files:
-        for uploaded_file in uploaded_files:
-            file_type = uploaded_file.name.split('.')[-1].lower()
-            try:
-                if file_type in ["geojson", "json"]:
-                    geojson = json.load(uploaded_file)
-                    features = geojson["features"] if geojson["type"] == "FeatureCollection" else [geojson]
-                    for feature in features:
-                        geom = feature["geometry"]
-                        if geom["type"].lower() == "polygon":
-                            coords = geom["coordinates"][0]
-                            if coords[0] != coords[-1]:
-                                coords.append(coords[0])
-                            all_polygons.append(coords)
-                        elif geom["type"].lower() == "multipolygon":
-                            for part in geom["coordinates"]:
-                                coords = part[0]
+    with st.spinner("Processing input..."):
+        if input_mode == "Paste Coordinates":
+            text = st.session_state.get("coord_input", "")
+            all_polygons = parse_coords(text)
+
+        elif input_mode == "Upload Map Files" and uploaded_files:
+            for uploaded_file in uploaded_files:
+                file_type = uploaded_file.name.split('.')[-1].lower()
+                try:
+                    if file_type in ["geojson", "json"]:
+                        geojson = json.load(uploaded_file)
+                        features = geojson["features"] if geojson["type"] == "FeatureCollection" else [geojson]
+                        for feature in features:
+                            geom = feature["geometry"]
+                            if geom["type"].lower() == "polygon":
+                                coords = geom["coordinates"][0]
                                 if coords[0] != coords[-1]:
                                     coords.append(coords[0])
                                 all_polygons.append(coords)
-                elif file_type == "kml":
-                    doc = uploaded_file.read().decode("utf-8")
-                    all_polygons.extend(extract_coords_from_kml_string(doc))
-                elif file_type == "kmz":
-                    all_polygons.extend(extract_coords_from_kmz(uploaded_file.read()))
-            except Exception as e:
-                st.error(f"Error processing {uploaded_file.name}: {e}")
+                            elif geom["type"].lower() == "multipolygon":
+                                for part in geom["coordinates"]:
+                                    coords = part[0]
+                                    if coords[0] != coords[-1]:
+                                        coords.append(coords[0])
+                                    all_polygons.append(coords)
+                    elif file_type == "kml":
+                        doc = uploaded_file.read().decode("utf-8")
+                        all_polygons.extend(extract_coords_from_kml_string(doc))
+                    elif file_type == "kmz":
+                        all_polygons.extend(extract_coords_from_kmz(uploaded_file.read()))
+                except Exception as e:
+                    st.error(f"Error processing {uploaded_file.name}: {e}")
 
     if all_polygons:
         st.session_state["coords"] = all_polygons
@@ -232,44 +229,41 @@ if st.session_state.get("generate_trigger"):
 if st.session_state.get("coords"):
     polygons = st.session_state["coords"]
 
-    # --- ✅ Export KML (correct lon, lat order) ---
-    kml = simplekml.Kml()
-    for i, poly in enumerate(polygons):
-        kml.newpolygon(name=f"Polygon {i+1}", outerboundaryis=poly)
+    with st.spinner("Generating map and estimating population..."):
+        # --- ✅ Export KML ---
+        kml = simplekml.Kml()
+        for i, poly in enumerate(polygons):
+            kml.newpolygon(name=f"Polygon {i+1}", outerboundaryis=poly)
 
-    # --- ✅ Export GeoJSON (correct lon, lat order) ---
-    geojson_data = {
-        "type": "FeatureCollection",
-        "features": [
-            {"type": "Feature", "geometry": {"type": "Polygon", "coordinates": [poly]}, "properties": {}} for poly in polygons
-        ]
-    }
+        # --- ✅ Export GeoJSON ---
+        geojson_data = {
+            "type": "FeatureCollection",
+            "features": [
+                {"type": "Feature", "geometry": {"type": "Polygon", "coordinates": [poly]}, "properties": {}} for poly in polygons
+            ]
+        }
 
-    col1, col2 = st.columns(2)
-    with col1:
-        st.download_button("Download KML", kml.kml().encode("utf-8"), file_name="polygons.kml", mime="application/vnd.google-earth.kml+xml", use_container_width=True)
-    with col2:
-        st.download_button("Download GeoJSON", json.dumps(geojson_data, indent=2).encode("utf-8"), file_name="polygons.geojson", mime="application/geo+json", use_container_width=True)
+        col1, col2 = st.columns(2)
+        with col1:
+            st.download_button("Download KML", kml.kml().encode("utf-8"), file_name="polygons.kml", mime="application/vnd.google-earth.kml+xml", use_container_width=True)
+        with col2:
+            st.download_button("Download GeoJSON", json.dumps(geojson_data, indent=2).encode("utf-8"), file_name="polygons.geojson", mime="application/geo+json", use_container_width=True)
 
-    # --- Population Estimate ---
-    raster_path = "data/landscan-global-2023.tif"
-    population = estimate_population_from_coords(polygons, raster_path)
-    if population is not None:
-        st.success(f"Estimated Population: {population:,.0f}")
+        # --- Population Estimate ---
+        raster_path = "data/landscan-global-2023.tif"
+        population = estimate_population_from_coords(polygons, raster_path)
+        if population is not None:
+            st.success(f"Estimated Population: {population:,.0f}")
 
-    # --- Map Rendering (lat, lon for Folium) ---
-    st.markdown("<h4 style='text-align: center;'>Polygon Preview</h4>", unsafe_allow_html=True)
-    m = folium.Map(tiles="CartoDB positron")
-    all_points = []
-    for poly in polygons:
-        latlons = [(lat, lon) for lon, lat in poly]
-        folium.Polygon(locations=latlons, color="blue", fill=True).add_to(m)
-        all_points.extend(latlons)
+        # --- Map Rendering ---
+        st.markdown("<h4 style='text-align: center;'>Polygon Preview</h4>", unsafe_allow_html=True)
+        m = folium.Map(tiles="CartoDB positron")
+        all_points = []
+        for poly in polygons:
+            latlons = [(lat, lon) for lon, lat in poly]
+            folium.Polygon(locations=latlons, color="blue", fill=True).add_to(m)
+            all_points.extend(latlons)
 
-    if all_points:
-        m.fit_bounds(all_points)
-    st_folium(m, width=700, height=400)
-
-    if not st.session_state["rerun_done"]:
-        st.session_state["rerun_done"] = True
-        st.rerun()
+        if all_points:
+            m.fit_bounds(all_points)
+        st_folium(m, width=700, height=400)
