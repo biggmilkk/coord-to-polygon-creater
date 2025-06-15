@@ -14,7 +14,7 @@ from io import BytesIO
 
 st.set_page_config(page_title="Polygon Generator and Population Estimate", layout="centered")
 
-# --- Session defaults ---
+# --- Session State Defaults ---
 for key, default in {
     "rerun_done": False,
     "coords": [],
@@ -31,10 +31,10 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-# --- Input Switch ---
+# --- Input Method ---
 input_mode = st.radio("Choose Input Method", ["Paste Coordinates", "Upload Map Files"], horizontal=True)
 
-# --- Paste Coordinates ---
+# --- Coordinate Input ---
 if input_mode == "Paste Coordinates":
     st.text_area(
         "Coordinates:",
@@ -48,21 +48,20 @@ uploaded_files = []
 if input_mode == "Upload Map Files":
     uploaded_files = st.file_uploader("Upload Polygon Files (KML, KMZ, GeoJSON, JSON)", type=["kml", "kmz", "geojson", "json"], accept_multiple_files=True)
 
+# --- Clean up if no input ---
 if input_mode == "Upload Map Files" and not uploaded_files:
     st.session_state["coords"] = []
-    st.session_state["file_was_uploaded"] = False
 elif input_mode == "Paste Coordinates" and not st.session_state.get("coord_input", "").strip():
     st.session_state["coords"] = []
 
-# --- Final Working Parser for LAT LON DM + Fix for Negative Longitude ---
+# --- Coordinate Parsing (LAT LON DM with negative lon) ---
 def dm_to_dd(dm):
-    dm = abs(dm)
     degrees = int(dm // 100)
     minutes = dm % 100
-    return degrees + minutes / 60
+    return round(degrees + minutes / 60, 6)
 
 def parse_coords(text):
-    text = re.sub(r'[^\d\s-]', ' ', text.upper())
+    text = re.sub(r'[^\d\s-]', ' ', text.upper())  # Remove non-numeric junk
     text = re.sub(r'\s+', ' ', text).strip()
     tokens = text.split()
 
@@ -70,19 +69,14 @@ def parse_coords(text):
     i = 0
     while i < len(tokens) - 1:
         try:
-            # Read in LAT LON order
             lat_dm = int(tokens[i])
             lon_dm = int(tokens[i + 1])
-
             if (lat_dm % 100) < 60 and (lon_dm % 100) < 60:
                 lat = dm_to_dd(lat_dm)
                 lon = dm_to_dd(lon_dm)
-
-                # Assume Western Hemisphere
                 if lon > 0:
-                    lon = -lon
-
-                coords.append((lon, lat))  # GeoJSON = (lon, lat)
+                    lon = -lon  # Assume Western Hemisphere
+                coords.append((lon, lat))  # GeoJSON/KML order
             i += 2
         except:
             i += 1
@@ -147,9 +141,13 @@ if st.button("Generate Map", use_container_width=True):
 # --- Main Processing ---
 if st.session_state.get("generate_trigger"):
     all_polygons = []
+
     if input_mode == "Paste Coordinates":
         text = st.session_state.get("coord_input", "")
         all_polygons = parse_coords(text)
+        if all_polygons:
+            st.write("✅ Parsed coordinates (lon, lat):")
+            st.write(all_polygons[0])
     elif input_mode == "Upload Map Files" and uploaded_files:
         for uploaded_file in uploaded_files:
             file_type = uploaded_file.name.split('.')[-1].lower()
@@ -180,7 +178,6 @@ if st.session_state.get("generate_trigger"):
 
     if all_polygons:
         st.session_state["coords"] = all_polygons
-        st.session_state["file_was_uploaded"] = True
     else:
         st.session_state["coords"] = []
         st.warning("No valid polygons found.")
@@ -190,7 +187,7 @@ if st.session_state.get("generate_trigger"):
 if st.session_state.get("coords"):
     polygons = st.session_state["coords"]
 
-    # Downloads
+    # Download Buttons
     kml = simplekml.Kml()
     for i, poly in enumerate(polygons):
         kml.newpolygon(name=f"Polygon {i+1}", outerboundaryis=poly)
@@ -208,19 +205,18 @@ if st.session_state.get("coords"):
     with col2:
         st.download_button("Download GeoJSON", json.dumps(geojson_data, indent=2).encode("utf-8"), file_name="polygons.geojson", mime="application/geo+json", use_container_width=True)
 
-    # Population
-    raster_path = "data/landscan-global-2023.tif"  # Replace with your raster path
+    # Population Estimate
+    raster_path = "data/landscan-global-2023.tif"
     population = estimate_population_from_coords(polygons, raster_path)
     if population is not None:
         st.success(f"Estimated Population: {population:,.0f}")
 
-    # Map
+    # Map Rendering (lat, lon for Folium)
     st.markdown("<h4 style='text-align: center;'>Polygon Preview</h4>", unsafe_allow_html=True)
     m = folium.Map(tiles="CartoDB positron")
     all_points = []
     for poly in polygons:
-        # Flip to (lat, lon) for Folium
-        latlons = [(lat, lon) for lon, lat in poly]
+        latlons = [(lat, lon) for lon, lat in poly]  # Flip for folium
         folium.Polygon(locations=latlons, color="blue", fill=True).add_to(m)
         all_points.extend(latlons)
 
