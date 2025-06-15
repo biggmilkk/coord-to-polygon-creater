@@ -12,8 +12,6 @@ from xml.etree import ElementTree as ET
 import zipfile
 from io import BytesIO
 
-#v0950.15.06.2925
-
 st.set_page_config(page_title="Polygon Generator and Population Estimate", layout="centered")
 
 # --- Session State Defaults ---
@@ -54,31 +52,31 @@ if input_mode == "Upload Map Files" and not uploaded_files:
 elif input_mode == "Paste Coordinates" and not st.session_state.get("coord_input", "").strip():
     st.session_state["coords"] = []
 
-# --- Coordinate Conversion ---
+# --- Coordinate Helpers ---
 def dm_to_dd(dm):
     degrees = int(dm // 100)
     minutes = dm % 100
     return round(degrees + minutes / 60, 6)
 
 def parse_coords(text):
-    # Remove non-digit characters except whitespace
-    text = re.sub(r'[^\d\s]', '', text)
+    text = re.sub(r'[^\d\s]', '', text)  # Remove non-digit characters
     tokens = re.findall(r'\d+', text)
     coords = []
 
     try:
         tokens = [int(token) for token in tokens]
-        i = 0
-        while i < len(tokens) - 1:
+        for i in range(0, len(tokens) - 1, 2):
             lat_dm = tokens[i]
             lon_dm = tokens[i + 1]
-            if (lat_dm % 100) < 60 and (lon_dm % 100) < 60:
-                lat = dm_to_dd(lat_dm)
-                lon = -dm_to_dd(lon_dm)  # Assume Western Hemisphere
-                coords.append((lat, lon))
-            i += 2
-        if coords and coords[0] != coords[-1]:
+            if (lat_dm % 100) >= 60 or (lon_dm % 100) >= 60:
+                continue  # skip invalid coords
+            lat = dm_to_dd(lat_dm)
+            lon = -dm_to_dd(lon_dm)  # assume Western Hemisphere
+            coords.append((lat, lon))
+
+        if len(coords) >= 3 and coords[0] != coords[-1]:
             coords.append(coords[0])
+
         return [coords] if coords else []
     except Exception as e:
         st.error(f"Parse error: {e}")
@@ -188,13 +186,13 @@ if st.session_state.get("coords"):
     polygons = st.session_state["coords"]
 
     with st.spinner("Generating map and estimating population..."):
-        # --- ✅ Export KML ---
+        # --- Export KML ---
         kml = simplekml.Kml()
         for i, poly in enumerate(polygons):
             kml_coords = [(lon, lat) for lat, lon in poly]
             kml.newpolygon(name=f"Polygon {i+1}", outerboundaryis=kml_coords)
 
-        # --- ✅ Export GeoJSON ---
+        # --- Export GeoJSON ---
         geojson_data = {
             "type": "FeatureCollection",
             "features": [
